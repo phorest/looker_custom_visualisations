@@ -13,7 +13,6 @@ looker.plugins.visualizations.add({
       ],
       default: "slim_no_icon" 
     },
-    // NEW OPTION: REMOVE THE WHITE BOX
     card_style: {
       type: "string",
       label: "Card Background",
@@ -70,12 +69,13 @@ looker.plugins.visualizations.add({
         .phorest-card {
           box-sizing: border-box;
           width: 100%;
-          height: 100%; /* Fill the Looker Tile */
+          height: 100%;
           display: flex;
           font-family: 'Roboto', 'Open Sans', sans-serif;
+          overflow: hidden;
         }
 
-        /* STYLE 1: The Full Card Look */
+        /* STYLES */
         .style-card {
           background: #ffffff;
           border-radius: 16px;
@@ -83,12 +83,9 @@ looker.plugins.visualizations.add({
           box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           border: 1px solid #f0f0f0;
         }
-
-        /* STYLE 2: Transparent (Blends into Looker Tile) */
         .style-transparent {
           background: transparent;
-          border-radius: 0;
-          padding: 0; /* Let Looker handle padding if possible, or keep minimal */
+          padding: 0;
           box-shadow: none;
           border: none;
         }
@@ -97,10 +94,11 @@ looker.plugins.visualizations.add({
         .layout-standard {
           flex-direction: column;
           align-items: flex-start;
-          justify-content: center; /* Center vertically in tile */
+          justify-content: center;
           gap: 16px; 
         }
-        
+        .layout-standard .content-group { gap: 12px; }
+
         .layout-slim {
           flex-direction: row;
           align-items: center;
@@ -111,13 +109,27 @@ looker.plugins.visualizations.add({
           align-items: center;
           gap: 16px;
         }
+
+        /* --- RESPONSIVE OVERRIDES --- */
         
+        /* When "is-small" class is added via JS */
+        .phorest-card.is-small .icon-box {
+          display: none !important; /* HIDE ICON */
+        }
+        
+        .phorest-card.is-small .metric-value {
+          font-size: 32px !important; /* Reduce font (36 -> 32) */
+        }
+        
+        .phorest-card.is-small.style-card {
+          padding: 16px !important; /* Reduce padding to save space */
+        }
+
         /* --- COMPONENTS --- */
         .content-group {
           display: flex;
-          flex-direction: column; /* Default for standard */
+          flex-direction: column;
         }
-        .layout-standard .content-group { gap: 12px; }
 
         .icon-box {
           width: 48px;
@@ -168,6 +180,17 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     var container = element.querySelector("#vis-container");
 
+    // --- SMART RESIZER ---
+    // Calculate width of the container
+    var rect = element.getBoundingClientRect();
+    var width = rect.width;
+    
+    // Logic: If width is less than 260px, enable "Small Mode"
+    var responsiveClass = "";
+    if (width < 260) {
+      responsiveClass = "is-small";
+    }
+
     if (!data || data.length === 0) {
       container.innerHTML = `<div style="color:#999;">No Data</div>`;
       return done();
@@ -195,7 +218,7 @@ looker.plugins.visualizations.add({
 
     // C. Config
     var layout = config.card_layout || "slim_no_icon"; 
-    var styleMode = config.card_style || "card"; // Default to Card if new
+    var styleMode = config.card_style || "card"; 
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
 
@@ -221,12 +244,11 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // --- LOGIC ---
     var layoutClass = (layout === "standard") ? "layout-standard" : "layout-slim";
     var styleClass = (styleMode === "transparent") ? "style-transparent" : "style-card";
 
-    // Icon HTML (Hidden if Slim No Icon)
     var iconHtml = "";
+    // Only show icon if "No Icon" is NOT selected
     if (layout !== "slim_no_icon") {
       iconHtml = `
         <div class="icon-box" style="background-color: ${userColor}20;"> 
@@ -238,7 +260,7 @@ looker.plugins.visualizations.add({
     }
 
     var html = `
-      <div class="phorest-card ${layoutClass} ${styleClass}">
+      <div class="phorest-card ${layoutClass} ${styleClass} ${responsiveClass}">
         
         <div class="content-group">
           ${iconHtml}
