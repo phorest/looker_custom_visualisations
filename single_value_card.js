@@ -11,7 +11,19 @@ looker.plugins.visualizations.add({
         {"Slim (Horizontal)": "slim"},
         {"Slim (No Icon)": "slim_no_icon"}
       ],
-      default: "slim_no_icon" // <--- This sets the default for NEW charts
+      default: "slim_no_icon" 
+    },
+    // NEW OPTION: REMOVE THE WHITE BOX
+    card_style: {
+      type: "string",
+      label: "Card Background",
+      display: "select",
+      section: "Style",
+      values: [
+        {"Phorest Card (Shadow & Border)": "card"},
+        {"Content Only (Transparent)": "transparent"}
+      ],
+      default: "card"
     },
     selected_icon: {
       type: "string",
@@ -54,54 +66,58 @@ looker.plugins.visualizations.add({
   create: function(element, config) {
     element.innerHTML = `
       <style>
-        /* Base Card Container */
+        /* Base Container */
         .phorest-card {
+          box-sizing: border-box;
+          width: 100%;
+          height: 100%; /* Fill the Looker Tile */
+          display: flex;
+          font-family: 'Roboto', 'Open Sans', sans-serif;
+        }
+
+        /* STYLE 1: The Full Card Look */
+        .style-card {
           background: #ffffff;
           border-radius: 16px;
           padding: 24px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           border: 1px solid #f0f0f0;
-          font-family: 'Roboto', 'Open Sans', sans-serif;
-          box-sizing: border-box;
-          width: 100%;
-          height: auto; 
-          display: flex;
+        }
+
+        /* STYLE 2: Transparent (Blends into Looker Tile) */
+        .style-transparent {
+          background: transparent;
+          border-radius: 0;
+          padding: 0; /* Let Looker handle padding if possible, or keep minimal */
+          box-shadow: none;
+          border: none;
         }
 
         /* --- LAYOUTS --- */
-
-        /* 1. STANDARD (Vertical Stack) */
         .layout-standard {
           flex-direction: column;
           align-items: flex-start;
-          gap: 20px; 
-        }
-        .layout-standard .content-group {
-          flex-direction: column;
-          align-items: flex-start;
+          justify-content: center; /* Center vertically in tile */
           gap: 16px; 
         }
-        .layout-standard .trend-box {
-          margin-top: 4px; 
-        }
-
-        /* 2. SLIM (Horizontal Row) */
+        
         .layout-slim {
           flex-direction: row;
           align-items: center;
           justify-content: space-between;
         }
         .layout-slim .content-group {
-          flex-direction: row; 
+          flex-direction: row;
           align-items: center;
           gap: 16px;
         }
         
         /* --- COMPONENTS --- */
-        
         .content-group {
           display: flex;
+          flex-direction: column; /* Default for standard */
         }
+        .layout-standard .content-group { gap: 12px; }
 
         .icon-box {
           width: 48px;
@@ -112,16 +128,9 @@ looker.plugins.visualizations.add({
           justify-content: center;
           flex-shrink: 0; 
         }
-        .icon-svg {
-          width: 24px;
-          height: 24px;
-          stroke-width: 1.5;
-        }
+        .icon-svg { width: 24px; height: 24px; stroke-width: 1.5; }
 
-        .text-box {
-          display: flex;
-          flex-direction: column;
-        }
+        .text-box { display: flex; flex-direction: column; }
 
         .metric-value {
           font-size: 36px;
@@ -130,9 +139,7 @@ looker.plugins.visualizations.add({
           line-height: 1;
           margin-bottom: 6px;
         }
-        .metric-value a { 
-          color: #111111 !important; text-decoration: none !important; pointer-events: none; 
-        }
+        .metric-value a { color: #111111 !important; text-decoration: none !important; pointer-events: none; }
 
         .metric-label {
           font-size: 14px;
@@ -151,9 +158,8 @@ looker.plugins.visualizations.add({
           gap: 4px;
         }
         .chevron-svg { width: 16px; height: 16px; stroke-width: 2.5; }
-
       </style>
-      <div id="vis-container" style="padding:10px; width:100%; box-sizing:border-box; background:#f8f9fa; display: flex; align-items: flex-start;">
+      <div id="vis-container" style="padding: 10px; width:100%; height:100%; box-sizing:border-box; display: flex;">
         </div>
     `;
   },
@@ -163,7 +169,7 @@ looker.plugins.visualizations.add({
     var container = element.querySelector("#vis-container");
 
     if (!data || data.length === 0) {
-      container.innerHTML = `<div style="color:#999; padding:20px;">No Data</div>`;
+      container.innerHTML = `<div style="color:#999;">No Data</div>`;
       return done();
     }
 
@@ -172,7 +178,7 @@ looker.plugins.visualizations.add({
     var value = data[0][measure.name].value;
     var formattedValue = LookerCharts.Utils.htmlForCell(data[0][measure.name]);
 
-    // B. Trend Logic
+    // B. Trend
     var trendHtml = "";
     if (data.length > 1) {
       var prevValue = data[1][measure.name].value;
@@ -181,18 +187,15 @@ looker.plugins.visualizations.add({
       
       var pillBg = isUp ? "#DCFCE7" : "#FFE9E9"; 
       var pillText = isUp ? "#008236" : "#FF1818"; 
-      
       var chevronUp = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>`;
       var chevronDown = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>`;
-      
       var icon = isUp ? chevronUp : chevronDown;
       trendHtml = `<div class="trend-pill" style="background-color: ${pillBg}; color: ${pillText};">${icon} ${Math.abs(trendPct).toFixed(1)}%</div>`;
     }
 
-    // C. Config & Layout
-    // Use "slim_no_icon" if nothing is saved in the config yet
+    // C. Config
     var layout = config.card_layout || "slim_no_icon"; 
-    
+    var styleMode = config.card_style || "card"; // Default to Card if new
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
 
@@ -218,11 +221,11 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // 1. Determine Layout Class
-    // FIXED LOGIC: If "Standard", use vertical class. Else use slim.
+    // --- LOGIC ---
     var layoutClass = (layout === "standard") ? "layout-standard" : "layout-slim";
-    
-    // 2. Hide Icon Logic
+    var styleClass = (styleMode === "transparent") ? "style-transparent" : "style-card";
+
+    // Icon HTML (Hidden if Slim No Icon)
     var iconHtml = "";
     if (layout !== "slim_no_icon") {
       iconHtml = `
@@ -234,9 +237,8 @@ looker.plugins.visualizations.add({
       `;
     }
 
-    // Build HTML
     var html = `
-      <div class="phorest-card ${layoutClass}">
+      <div class="phorest-card ${layoutClass} ${styleClass}">
         
         <div class="content-group">
           ${iconHtml}
