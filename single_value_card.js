@@ -65,13 +65,17 @@ looker.plugins.visualizations.add({
   create: function(element, config) {
     element.innerHTML = `
       <style>
+        /* IMPORT NUNITO FONT */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+
         /* Base Container */
         .phorest-card {
           box-sizing: border-box;
           width: 100%;
           height: 100%;
           display: flex;
-          font-family: 'Roboto', 'Open Sans', sans-serif;
+          /* APPLY FONT HERE */
+          font-family: 'Nunito', sans-serif; 
           overflow: hidden;
         }
 
@@ -79,7 +83,7 @@ looker.plugins.visualizations.add({
         .style-card {
           background: #ffffff;
           border-radius: 16px;
-          padding: 24px;
+          padding: 20px; 
           box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           border: 1px solid #f0f0f0;
         }
@@ -108,21 +112,6 @@ looker.plugins.visualizations.add({
           flex-direction: row;
           align-items: center;
           gap: 16px;
-        }
-
-        /* --- RESPONSIVE OVERRIDES --- */
-        
-        /* When "is-small" class is added via JS */
-        .phorest-card.is-small .icon-box {
-          display: none !important; /* HIDE ICON */
-        }
-        
-        .phorest-card.is-small .metric-value {
-          font-size: 32px !important; /* Reduce font (36 -> 32) */
-        }
-        
-        .phorest-card.is-small.style-card {
-          padding: 16px !important; /* Reduce padding to save space */
         }
 
         /* --- COMPONENTS --- */
@@ -171,25 +160,15 @@ looker.plugins.visualizations.add({
         }
         .chevron-svg { width: 16px; height: 16px; stroke-width: 2.5; }
       </style>
-      <div id="vis-container" style="padding: 10px; width:100%; height:100%; box-sizing:border-box; display: flex;">
-        </div>
+      
+      <div id="vis-container" style="padding: 10px; width:100%; height:100%; box-sizing:border-box; display: flex; background: #f4f5f7; overflow: hidden;">
+      </div>
     `;
   },
 
   // --- 3. RENDER ---
   updateAsync: function(data, element, config, queryResponse, details, done) {
     var container = element.querySelector("#vis-container");
-
-    // --- SMART RESIZER ---
-    // Calculate width of the container
-    var rect = element.getBoundingClientRect();
-    var width = rect.width;
-    
-    // Logic: If width is less than 260px, enable "Small Mode"
-    var responsiveClass = "";
-    if (width < 260) {
-      responsiveClass = "is-small";
-    }
 
     if (!data || data.length === 0) {
       container.innerHTML = `<div style="color:#999;">No Data</div>`;
@@ -248,7 +227,6 @@ looker.plugins.visualizations.add({
     var styleClass = (styleMode === "transparent") ? "style-transparent" : "style-card";
 
     var iconHtml = "";
-    // Only show icon if "No Icon" is NOT selected
     if (layout !== "slim_no_icon") {
       iconHtml = `
         <div class="icon-box" style="background-color: ${userColor}20;"> 
@@ -260,7 +238,7 @@ looker.plugins.visualizations.add({
     }
 
     var html = `
-      <div class="phorest-card ${layoutClass} ${styleClass} ${responsiveClass}">
+      <div class="phorest-card ${layoutClass} ${styleClass}">
         
         <div class="content-group">
           ${iconHtml}
