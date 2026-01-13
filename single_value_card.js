@@ -68,14 +68,13 @@ looker.plugins.visualizations.add({
         /* IMPORT NUNITO FONT */
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
 
-        /* Base Container */
+        /* Base Card Container */
         .phorest-card {
           box-sizing: border-box;
           width: 100%;
-          height: 100%;
+          height: 100%; /* Force full height to fill tile */
           display: flex;
-          /* APPLY FONT HERE */
-          font-family: 'Nunito', sans-serif; 
+          font-family: 'Nunito', sans-serif;
           overflow: hidden;
         }
 
@@ -83,7 +82,7 @@ looker.plugins.visualizations.add({
         .style-card {
           background: #ffffff;
           border-radius: 16px;
-          padding: 20px; 
+          padding: 20px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.06);
           border: 1px solid #f0f0f0;
         }
@@ -98,26 +97,33 @@ looker.plugins.visualizations.add({
         .layout-standard {
           flex-direction: column;
           align-items: flex-start;
-          justify-content: center;
+          justify-content: center; /* Vertically center content */
           gap: 16px; 
         }
-        .layout-standard .content-group { gap: 12px; }
+        .layout-standard .content-group {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px; 
+        }
+        .layout-standard .trend-box {
+          margin-top: 4px; 
+        }
 
+        /* Slim Layout */
         .layout-slim {
           flex-direction: row;
           align-items: center;
           justify-content: space-between;
         }
         .layout-slim .content-group {
-          flex-direction: row;
+          flex-direction: row; 
           align-items: center;
           gap: 16px;
         }
-
+        
         /* --- COMPONENTS --- */
         .content-group {
           display: flex;
-          flex-direction: column;
         }
 
         .icon-box {
@@ -129,9 +135,16 @@ looker.plugins.visualizations.add({
           justify-content: center;
           flex-shrink: 0; 
         }
-        .icon-svg { width: 24px; height: 24px; stroke-width: 1.5; }
+        .icon-svg {
+          width: 24px;
+          height: 24px;
+          stroke-width: 1.5;
+        }
 
-        .text-box { display: flex; flex-direction: column; }
+        .text-box {
+          display: flex;
+          flex-direction: column;
+        }
 
         .metric-value {
           font-size: 36px;
@@ -139,8 +152,17 @@ looker.plugins.visualizations.add({
           color: #111111 !important;
           line-height: 1;
           margin-bottom: 6px;
+          cursor: pointer;
+          transition: all 0.2s ease;
         }
-        .metric-value a { color: #111111 !important; text-decoration: none !important; pointer-events: none; }
+        .metric-value:hover {
+          text-decoration: underline !important;
+          text-decoration-color: #111111 !important;
+          text-decoration-thickness: 2px !important;
+        }
+        .metric-value a { 
+          color: #111111 !important; text-decoration: none !important; pointer-events: none; 
+        }
 
         .metric-label {
           font-size: 14px;
@@ -159,9 +181,10 @@ looker.plugins.visualizations.add({
           gap: 4px;
         }
         .chevron-svg { width: 16px; height: 16px; stroke-width: 2.5; }
+
       </style>
       
-      <div id="vis-container" style="padding: 10px; width:100%; height:100%; box-sizing:border-box; display: flex; background: #f4f5f7; overflow: hidden;">
+      <div id="vis-container" style="padding:0; width:100%; height:100%; box-sizing:border-box; background:#f8f9fa; display: flex; align-items: flex-start;">
       </div>
     `;
   },
@@ -171,16 +194,17 @@ looker.plugins.visualizations.add({
     var container = element.querySelector("#vis-container");
 
     if (!data || data.length === 0) {
-      container.innerHTML = `<div style="color:#999;">No Data</div>`;
+      container.innerHTML = `<div style="color:#999; padding:20px;">No Data</div>`;
       return done();
     }
 
     // A. Data
     var measure = queryResponse.fields.measures[0];
-    var value = data[0][measure.name].value;
-    var formattedValue = LookerCharts.Utils.htmlForCell(data[0][measure.name]);
+    var cell = data[0][measure.name];
+    var value = cell.value;
+    var formattedValue = LookerCharts.Utils.htmlForCell(cell);
 
-    // B. Trend
+    // B. Trend Logic
     var trendHtml = "";
     if (data.length > 1) {
       var prevValue = data[1][measure.name].value;
@@ -189,15 +213,17 @@ looker.plugins.visualizations.add({
       
       var pillBg = isUp ? "#DCFCE7" : "#FFE9E9"; 
       var pillText = isUp ? "#008236" : "#FF1818"; 
+      
       var chevronUp = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>`;
       var chevronDown = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>`;
+      
       var icon = isUp ? chevronUp : chevronDown;
       trendHtml = `<div class="trend-pill" style="background-color: ${pillBg}; color: ${pillText};">${icon} ${Math.abs(trendPct).toFixed(1)}%</div>`;
     }
 
-    // C. Config
+    // C. Config & Layout
     var layout = config.card_layout || "slim_no_icon"; 
-    var styleMode = config.card_style || "card"; 
+    
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
 
@@ -224,7 +250,7 @@ looker.plugins.visualizations.add({
     }
 
     var layoutClass = (layout === "standard") ? "layout-standard" : "layout-slim";
-    var styleClass = (styleMode === "transparent") ? "style-transparent" : "style-card";
+    var styleClass = (config.card_style === "transparent") ? "style-transparent" : "style-card";
 
     var iconHtml = "";
     if (layout !== "slim_no_icon") {
@@ -243,7 +269,7 @@ looker.plugins.visualizations.add({
         <div class="content-group">
           ${iconHtml}
           <div class="text-box">
-            <div class="metric-value">${formattedValue}</div>
+            <div class="metric-value" id="drill-target">${formattedValue}</div>
             <div class="metric-label">${label}</div>
           </div>
         </div>
@@ -256,6 +282,21 @@ looker.plugins.visualizations.add({
     `;
 
     container.innerHTML = html;
+
+    // --- ADD DRILL CLICK LISTENER ---
+    var drillTarget = container.querySelector("#drill-target");
+    if (cell.links && cell.links.length > 0) {
+      drillTarget.addEventListener("click", function(event) {
+        LookerCharts.Utils.openDrillMenu({
+          links: cell.links,
+          event: event
+        });
+      });
+    } else {
+      drillTarget.style.cursor = "default";
+      drillTarget.style.textDecoration = "none";
+    }
+
     done();
   }
 });
