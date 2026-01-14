@@ -66,10 +66,21 @@ looker.plugins.visualizations.add({
     this._addBaseStructure(element);
   },
   
+  // Helper to ensure container exists (Fixes crash on resize)
   _addBaseStructure: function(element) {
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
+
+        /* --- OVERRIDE LOOKER DEFAULTS --- */
+        /* This fixes the "calc(100% - 20px)" issue */
+        html, body, #vis {
+            height: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }
 
         .phorest-card {
           box-sizing: border-box;
@@ -95,15 +106,9 @@ looker.plugins.visualizations.add({
         }
 
         /* --- RESPONSIVE FONT SIZES --- */
-        /* Default is 36px defined below */
-        
-        .phorest-card.size-small .metric-value { 
-          font-size: 30px !important; /* Smaller for narrow tiles */
-        }
-        
-        .phorest-card.size-large .metric-value { 
-          font-size: 42px !important; /* Larger for wide tiles */
-        }
+        /* Default is 36px. These override based on tile width. */
+        .phorest-card.size-small .metric-value { font-size: 30px !important; }
+        .phorest-card.size-large .metric-value { font-size: 42px !important; }
 
         /* --- LAYOUTS --- */
         .layout-standard {
@@ -133,9 +138,7 @@ looker.plugins.visualizations.add({
         }
         
         /* --- COMPONENTS --- */
-        .content-group {
-          display: flex;
-        }
+        .content-group { display: flex; }
 
         .icon-box {
           width: 48px;
@@ -146,19 +149,12 @@ looker.plugins.visualizations.add({
           justify-content: center;
           flex-shrink: 0; 
         }
-        .icon-svg {
-          width: 24px;
-          height: 24px;
-          stroke-width: 1.5;
-        }
+        .icon-svg { width: 24px; height: 24px; stroke-width: 1.5; }
 
-        .text-box {
-          display: flex;
-          flex-direction: column;
-        }
+        .text-box { display: flex; flex-direction: column; }
 
         .metric-value {
-          font-size: 36px; /* Default Size */
+          font-size: 36px;
           font-weight: 700;
           color: #111111 !important;
           line-height: 1;
@@ -166,6 +162,7 @@ looker.plugins.visualizations.add({
           cursor: pointer;
           transition: all 0.2s ease;
         }
+        /* Hover: Black underline */
         .metric-value:hover {
           text-decoration: underline !important;
           text-decoration-color: #111111 !important;
@@ -175,11 +172,7 @@ looker.plugins.visualizations.add({
           color: #111111 !important; text-decoration: none !important; pointer-events: none; 
         }
 
-        .metric-label {
-          font-size: 14px;
-          color: #6b7280;
-          font-weight: 500;
-        }
+        .metric-label { font-size: 14px; color: #6b7280; font-weight: 500; }
 
         .trend-pill {
           display: inline-flex;
@@ -195,7 +188,7 @@ looker.plugins.visualizations.add({
 
       </style>
       
-      <div class="vis-container" style="padding:0; width:100%; height:100%; box-sizing:border-box; background:#f4f5f7; display: flex; align-items: flex-start;">
+      <div class="vis-container" style="padding:0; width:100%; height:100%; box-sizing:border-box; background:#f4f5f7; display: flex; align-items: stretch;">
       </div>
     `;
   },
@@ -203,7 +196,7 @@ looker.plugins.visualizations.add({
   // --- 3. RENDER ---
   updateAsync: function(data, element, config, queryResponse, details, done) {
     
-    // 1. Safety Check
+    // Safety check for container (using class selector)
     var container = element.querySelector(".vis-container");
     if (!container) {
       this._addBaseStructure(element);
@@ -215,13 +208,13 @@ looker.plugins.visualizations.add({
       return done();
     }
 
-    // 2. Data Extraction
+    // A. Data
     var measure = queryResponse.fields.measures[0];
     var cell = data[0][measure.name];
     var value = cell.value;
     var formattedValue = LookerCharts.Utils.htmlForCell(cell);
 
-    // 3. Trend Logic
+    // B. Trend Logic
     var trendHtml = "";
     if (data.length > 1) {
       var prevValue = data[1][measure.name].value;
@@ -238,7 +231,7 @@ looker.plugins.visualizations.add({
       trendHtml = `<div class="trend-pill" style="background-color: ${pillBg}; color: ${pillText};">${icon} ${Math.abs(trendPct).toFixed(1)}%</div>`;
     }
 
-    // 4. Config & Layout
+    // C. Config
     var layout = config.card_layout || "slim_no_icon"; 
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
@@ -301,10 +294,8 @@ looker.plugins.visualizations.add({
     var rect = container.getBoundingClientRect();
     var cardElement = container.querySelector(".phorest-card");
     
-    // Clean previous classes
     cardElement.classList.remove("size-small", "size-large");
 
-    // Apply thresholds
     if (rect.width < 320) {
       cardElement.classList.add("size-small"); // 30px
     } else if (rect.width > 500) {
