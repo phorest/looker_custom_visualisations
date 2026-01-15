@@ -1,7 +1,5 @@
 looker.plugins.visualizations.add({
-  // --- 1. CONFIG OPTIONS ---
   options: {
-    // LAYOUT
     card_layout: {
       type: "string",
       label: "Layout",
@@ -14,7 +12,6 @@ looker.plugins.visualizations.add({
       ],
       default: "standard" 
     },
-    // ICON TOGGLE
     show_icon: {
       type: "boolean",
       label: "Show Icon",
@@ -32,7 +29,13 @@ looker.plugins.visualizations.add({
       ],
       default: "card"
     },
-    // FONT CONTROLS
+    trend_reverse_colors: {
+      type: "boolean",
+      label: "Negative Trend is Good (Green)",
+      section: "Style",
+      default: false,
+      order: 4
+    },
     enable_custom_fonts: {
       type: "boolean",
       label: "Enable Custom Font Sizes",
@@ -90,7 +93,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // --- 2. SETUP ---
   create: function(element, config) {
     this._addBaseStructure(element);
   },
@@ -100,7 +102,6 @@ looker.plugins.visualizations.add({
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
 
-        /* RESET LOOKER DEFAULTS TO FIX GAP */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
@@ -132,13 +133,9 @@ looker.plugins.visualizations.add({
           border: none;
         }
 
-        /* --- RESPONSIVE FONT SIZES (Applied if custom fonts OFF) --- */
         .phorest-card.size-small .metric-value.auto-size { font-size: 30px !important; }
         .phorest-card.size-large .metric-value.auto-size { font-size: 42px !important; }
 
-        /* --- LAYOUTS --- */
-        
-        /* 1. STANDARD */
         .layout-standard {
           flex-direction: column;
           align-items: flex-start;
@@ -154,7 +151,6 @@ looker.plugins.visualizations.add({
           margin-top: 4px; 
         }
 
-        /* 2. SLIM */
         .layout-slim {
           flex-direction: row;
           align-items: center;
@@ -166,7 +162,6 @@ looker.plugins.visualizations.add({
           gap: 16px;
         }
 
-        /* 3. CENTERED (New) */
         .layout-centered {
           flex-direction: column;
           align-items: center;
@@ -183,7 +178,6 @@ looker.plugins.visualizations.add({
           margin-top: 4px;
         }
         
-        /* --- COMPONENTS --- */
         .content-group { display: flex; }
 
         .icon-box {
@@ -200,7 +194,7 @@ looker.plugins.visualizations.add({
         .text-box { display: flex; flex-direction: column; }
 
         .metric-value {
-          font-size: 36px; /* Default */
+          font-size: 36px;
           font-weight: 700;
           color: #111111 !important;
           line-height: 1;
@@ -238,10 +232,8 @@ looker.plugins.visualizations.add({
     `;
   },
 
-  // --- 3. RENDER ---
   updateAsync: function(data, element, config, queryResponse, details, done) {
     
-    // Safety check for container
     var container = element.querySelector(".vis-container");
     if (!container) {
       this._addBaseStructure(element);
@@ -253,50 +245,49 @@ looker.plugins.visualizations.add({
       return done();
     }
 
-    // A. Data
     var measure = queryResponse.fields.measures[0];
     var cell = data[0][measure.name];
     var value = cell.value;
     var formattedValue = LookerCharts.Utils.htmlForCell(cell);
 
-    // B. Trend Logic
     var trendHtml = "";
     if (data.length > 1) {
       var prevValue = data[1][measure.name].value;
       var trendPct = ((value - prevValue) / prevValue) * 100;
       var isUp = trendPct >= 0;
       
-      var pillBg = isUp ? "#DCFCE7" : "#FFE9E9"; 
-      var pillText = isUp ? "#008236" : "#FF1818"; 
+      var reverseColors = config.trend_reverse_colors || false;
+      var isGood = reverseColors ? !isUp : isUp;
+
+      var pillBg = isGood ? "#DCFCE7" : "#FFE9E9"; 
+      var pillText = isGood ? "#008236" : "#FF1818"; 
       
       var chevronUp = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>`;
       var chevronDown = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="chevron-svg"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>`;
       
       var icon = isUp ? chevronUp : chevronDown;
+      
       trendHtml = `<div class="trend-pill" style="background-color: ${pillBg}; color: ${pillText};">${icon} ${Math.abs(trendPct).toFixed(1)}%</div>`;
     }
 
-    // C. Config
     var layout = config.card_layout || "standard";
-    var showIcon = (config.show_icon === undefined) ? true : config.show_icon; // Default true
+    var showIcon = (config.show_icon === undefined) ? true : config.show_icon;
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
     var styleClass = (config.card_style === "transparent") ? "style-transparent" : "style-card";
 
-    // FONT OVERRIDE LOGIC
     var customValueStyle = "";
     var customLabelStyle = "";
-    var autoSizeClass = "auto-size"; // Class to enable responsive scaling
+    var autoSizeClass = "auto-size";
 
     if (config.enable_custom_fonts) {
-        autoSizeClass = ""; // Disable responsive scaling class if custom is on
+        autoSizeClass = "";
         var valSize = config.value_font_size || 36;
         var lblSize = config.label_font_size || 14;
         customValueStyle = `style="font-size: ${valSize}px !important;"`;
         customLabelStyle = `style="font-size: ${lblSize}px !important;"`;
     }
 
-    // Icons
     const HERO_ICONS = {
       "cash": '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />',
       "users": '<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />',
@@ -318,13 +309,11 @@ looker.plugins.visualizations.add({
       }
     }
 
-    // Determine Classes
     var layoutClass = "";
     if (layout === "centered") layoutClass = "layout-centered";
     else if (layout === "slim") layoutClass = "layout-slim";
     else layoutClass = "layout-standard";
 
-    // Icon HTML (Hide if toggle is off)
     var iconHtml = "";
     if (showIcon) {
       iconHtml = `
@@ -336,7 +325,6 @@ looker.plugins.visualizations.add({
       `;
     }
 
-    // --- HTML RENDER ---
     var html = `
       <div class="phorest-card ${layoutClass} ${styleClass}">
         <div class="content-group">
@@ -354,7 +342,6 @@ looker.plugins.visualizations.add({
 
     container.innerHTML = html;
 
-    // --- RESPONSIVE LOGIC (Only if Custom Fonts are DISABLED) ---
     if (!config.enable_custom_fonts) {
         var rect = container.getBoundingClientRect();
         var cardElement = container.querySelector(".phorest-card");
@@ -362,13 +349,12 @@ looker.plugins.visualizations.add({
         cardElement.classList.remove("size-small", "size-large");
 
         if (rect.width < 320) {
-          cardElement.classList.add("size-small"); // 30px
+          cardElement.classList.add("size-small");
         } else if (rect.width > 500) {
-          cardElement.classList.add("size-large"); // 42px
+          cardElement.classList.add("size-large");
         }
     }
 
-    // --- ADD DRILL CLICK LISTENER ---
     var drillTarget = container.querySelector("#drill-target");
     if (cell.links && cell.links.length > 0) {
       drillTarget.addEventListener("click", function(event) {
