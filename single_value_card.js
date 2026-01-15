@@ -1,6 +1,7 @@
 looker.plugins.visualizations.add({
   // --- 1. CONFIG OPTIONS ---
   options: {
+    // LAYOUT
     card_layout: {
       type: "string",
       label: "Layout",
@@ -9,9 +10,16 @@ looker.plugins.visualizations.add({
       values: [
         {"Standard (Vertical)": "standard"},
         {"Slim (Horizontal)": "slim"},
-        {"Slim (No Icon)": "slim_no_icon"}
+        {"Centered": "centered"}
       ],
-      default: "slim_no_icon" 
+      default: "standard" 
+    },
+    // ICON TOGGLE
+    show_icon: {
+      type: "boolean",
+      label: "Show Icon",
+      section: "Style",
+      default: true
     },
     card_style: {
       type: "string",
@@ -23,6 +31,27 @@ looker.plugins.visualizations.add({
         {"Content Only (Transparent)": "transparent"}
       ],
       default: "card"
+    },
+    // FONT CONTROLS
+    enable_custom_fonts: {
+      type: "boolean",
+      label: "Enable Custom Font Sizes",
+      section: "Typography",
+      default: false
+    },
+    value_font_size: {
+      type: "number",
+      label: "Value Size (px)",
+      section: "Typography",
+      default: 36,
+      display: "text"
+    },
+    label_font_size: {
+      type: "number",
+      label: "Label Size (px)",
+      section: "Typography",
+      default: 14,
+      display: "text"
     },
     selected_icon: {
       type: "string",
@@ -66,14 +95,12 @@ looker.plugins.visualizations.add({
     this._addBaseStructure(element);
   },
   
-  // Helper to ensure container exists (Fixes crash on resize)
   _addBaseStructure: function(element) {
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap');
 
-        /* --- OVERRIDE LOOKER DEFAULTS --- */
-        /* This fixes the "calc(100% - 20px)" issue */
+        /* RESET LOOKER DEFAULTS TO FIX GAP */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
@@ -105,12 +132,13 @@ looker.plugins.visualizations.add({
           border: none;
         }
 
-        /* --- RESPONSIVE FONT SIZES --- */
-        /* Default is 36px. These override based on tile width. */
-        .phorest-card.size-small .metric-value { font-size: 30px !important; }
-        .phorest-card.size-large .metric-value { font-size: 42px !important; }
+        /* --- RESPONSIVE FONT SIZES (Applied if custom fonts OFF) --- */
+        .phorest-card.size-small .metric-value.auto-size { font-size: 30px !important; }
+        .phorest-card.size-large .metric-value.auto-size { font-size: 42px !important; }
 
         /* --- LAYOUTS --- */
+        
+        /* 1. STANDARD */
         .layout-standard {
           flex-direction: column;
           align-items: flex-start;
@@ -126,6 +154,7 @@ looker.plugins.visualizations.add({
           margin-top: 4px; 
         }
 
+        /* 2. SLIM */
         .layout-slim {
           flex-direction: row;
           align-items: center;
@@ -135,6 +164,23 @@ looker.plugins.visualizations.add({
           flex-direction: row; 
           align-items: center;
           gap: 16px;
+        }
+
+        /* 3. CENTERED (New) */
+        .layout-centered {
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 16px;
+        }
+        .layout-centered .content-group {
+          flex-direction: column;
+          align-items: center;
+          gap: 12px;
+        }
+        .layout-centered .trend-box {
+          margin-top: 4px;
         }
         
         /* --- COMPONENTS --- */
@@ -154,7 +200,7 @@ looker.plugins.visualizations.add({
         .text-box { display: flex; flex-direction: column; }
 
         .metric-value {
-          font-size: 36px;
+          font-size: 36px; /* Default */
           font-weight: 700;
           color: #111111 !important;
           line-height: 1;
@@ -162,7 +208,6 @@ looker.plugins.visualizations.add({
           cursor: pointer;
           transition: all 0.2s ease;
         }
-        /* Hover: Black underline */
         .metric-value:hover {
           text-decoration: underline !important;
           text-decoration-color: #111111 !important;
@@ -196,7 +241,7 @@ looker.plugins.visualizations.add({
   // --- 3. RENDER ---
   updateAsync: function(data, element, config, queryResponse, details, done) {
     
-    // Safety check for container (using class selector)
+    // Safety check for container
     var container = element.querySelector(".vis-container");
     if (!container) {
       this._addBaseStructure(element);
@@ -232,10 +277,24 @@ looker.plugins.visualizations.add({
     }
 
     // C. Config
-    var layout = config.card_layout || "slim_no_icon"; 
+    var layout = config.card_layout || "standard";
+    var showIcon = (config.show_icon === undefined) ? true : config.show_icon; // Default true
     var userColor = config.theme_color || "#34A853";
     var label = config.label_override || measure.label_short || measure.label;
     var styleClass = (config.card_style === "transparent") ? "style-transparent" : "style-card";
+
+    // FONT OVERRIDE LOGIC
+    var customValueStyle = "";
+    var customLabelStyle = "";
+    var autoSizeClass = "auto-size"; // Class to enable responsive scaling
+
+    if (config.enable_custom_fonts) {
+        autoSizeClass = ""; // Disable responsive scaling class if custom is on
+        var valSize = config.value_font_size || 36;
+        var lblSize = config.label_font_size || 14;
+        customValueStyle = `style="font-size: ${valSize}px !important;"`;
+        customLabelStyle = `style="font-size: ${lblSize}px !important;"`;
+    }
 
     // Icons
     const HERO_ICONS = {
@@ -259,9 +318,15 @@ looker.plugins.visualizations.add({
       }
     }
 
-    var layoutClass = (layout === "standard") ? "layout-standard" : "layout-slim";
+    // Determine Classes
+    var layoutClass = "";
+    if (layout === "centered") layoutClass = "layout-centered";
+    else if (layout === "slim") layoutClass = "layout-slim";
+    else layoutClass = "layout-standard";
+
+    // Icon HTML (Hide if toggle is off)
     var iconHtml = "";
-    if (layout !== "slim_no_icon") {
+    if (showIcon) {
       iconHtml = `
         <div class="icon-box" style="background-color: ${userColor}20;"> 
           <svg class="icon-svg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="${userColor}">
@@ -277,8 +342,8 @@ looker.plugins.visualizations.add({
         <div class="content-group">
           ${iconHtml}
           <div class="text-box">
-            <div class="metric-value" id="drill-target">${formattedValue}</div>
-            <div class="metric-label">${label}</div>
+            <div class="metric-value ${autoSizeClass}" id="drill-target" ${customValueStyle}>${formattedValue}</div>
+            <div class="metric-label" ${customLabelStyle}>${label}</div>
           </div>
         </div>
         <div class="trend-box">
@@ -289,17 +354,18 @@ looker.plugins.visualizations.add({
 
     container.innerHTML = html;
 
-    // --- RESPONSIVE LOGIC ---
-    // Measure width and apply classes for font sizing
-    var rect = container.getBoundingClientRect();
-    var cardElement = container.querySelector(".phorest-card");
-    
-    cardElement.classList.remove("size-small", "size-large");
+    // --- RESPONSIVE LOGIC (Only if Custom Fonts are DISABLED) ---
+    if (!config.enable_custom_fonts) {
+        var rect = container.getBoundingClientRect();
+        var cardElement = container.querySelector(".phorest-card");
+        
+        cardElement.classList.remove("size-small", "size-large");
 
-    if (rect.width < 320) {
-      cardElement.classList.add("size-small"); // 30px
-    } else if (rect.width > 500) {
-      cardElement.classList.add("size-large"); // 42px
+        if (rect.width < 320) {
+          cardElement.classList.add("size-small"); // 30px
+        } else if (rect.width > 500) {
+          cardElement.classList.add("size-large"); // 42px
+        }
     }
 
     // --- ADD DRILL CLICK LISTENER ---
