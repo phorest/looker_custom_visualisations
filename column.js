@@ -1,272 +1,354 @@
 looker.plugins.visualizations.add({
-  // Options
+  // 1. CONFIGURATION OPTIONS
   options: {
-    bar_color: {
-      type: "array",
-      label: "Chart Colors",
-      display: "colors",
-      default: ["#4285F4", "#34A853", "#EA4335", "#FBBC04"]
+    // --- PLOT TAB ---
+    positioning: {
+      type: "string",
+      label: "Series Positioning",
+      display: "select",
+      section: "Plot",
+      values: [
+        { "Grouped": "grouped" },
+        { "Stacked": "stacked" }
+      ],
+      default: "grouped"
     },
-    show_trend: {
+    hide_legend: {
       type: "boolean",
-      label: "Show Trend %",
+      label: "Hide Legend",
+      section: "Plot",
+      default: false
+    },
+
+    // --- SERIES TAB ---
+    // (Colors handled automatically or via Looker native settings)
+
+    // --- VALUES TAB ---
+    show_values: {
+      type: "boolean",
+      label: "Value Labels",
+      section: "Values",
+      default: false
+    },
+    value_font_size: {
+      type: "number",
+      label: "Label Size",
+      section: "Values",
+      default: 12
+    },
+    // Useful for the labels ON the bars
+    value_format: {
+        type: "string",
+        label: "Value Label Format",
+        section: "Values",
+        placeholder: "#,##0",
+        default: ""
+    },
+
+    // --- X AXIS TAB ---
+    show_xaxis_name: {
+      type: "boolean",
+      label: "Show Axis Name",
+      section: "X",
       default: true
+    },
+    xaxis_label_rotation: {
+      type: "number",
+      label: "Label Rotation",
+      section: "X",
+      default: 0,
+      min: -360,
+      max: 360
+    },
+    show_x_gridlines: {
+      type: "boolean",
+      label: "Show Gridlines",
+      section: "X",
+      default: false
+    },
+
+    // --- Y AXIS TAB (Replicating your Screenshot) ---
+    show_y_gridlines: {
+        type: "boolean",
+        label: "Show Gridlines",
+        section: "Y",
+        default: true
+    },
+    y_axis_reverse: {
+        type: "boolean",
+        label: "Reverse Axis",
+        section: "Y",
+        default: false
+    },
+    y_axis_scale_type: {
+        type: "string",
+        label: "Scale Type",
+        display: "select",
+        section: "Y",
+        values: [
+           {"Linear": "linear"},
+           {"Logarithmic": "logarithmic"}
+        ],
+        default: "linear"
+    },
+    show_yaxis_name: {
+        type: "boolean",
+        label: "Show Axis Name",
+        section: "Y",
+        default: true
+    },
+    y_axis_name: {
+        type: "string",
+        label: "Axis Name (Override)",
+        section: "Y",
+        placeholder: "Leave blank for default"
+    },
+    show_y_axis_values: {
+        type: "boolean",
+        label: "Show Axis Values",
+        section: "Y",
+        default: true
+    },
+    unpin_y_from_zero: {
+        type: "boolean",
+        label: "Unpin Axis From Zero",
+        section: "Y",
+        default: false
+    },
+    y_axis_min: {
+        type: "number",
+        label: "Minimum Value",
+        section: "Y",
+        display: "text", // Allows empty input
+        placeholder: "Auto"
+    },
+    y_axis_max: {
+        type: "number",
+        label: "Maximum Value",
+        section: "Y",
+        display: "text",
+        placeholder: "Auto"
+    },
+    y_axis_tick_density: {
+        type: "string",
+        label: "Tick Density",
+        display: "select",
+        section: "Y",
+        values: [
+            {"Default": "default"},
+            {"Custom": "custom"} // Maps to a fixed count for simplicity
+        ],
+        default: "default"
+    },
+    y_axis_tick_count: {
+        type: "number",
+        label: "Tick Count",
+        section: "Y",
+        default: 10,
+        display: "text",
+        hidden: true // We can toggle this visibility in a more advanced setup, currently just an input
     }
   },
 
-  // Setup
+  // 2. SETUP
   create: function(element, config) {
+    if (!document.getElementById('chartjs-script')) {
+        const script = document.createElement('script');
+        script.id = 'chartjs-script';
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = () => {
+            const pluginScript = document.createElement('script');
+            pluginScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0';
+            pluginScript.onload = () => { this.chartLoaded = true; this.triggerUpdate(); };
+            document.head.appendChild(pluginScript);
+        };
+        document.head.appendChild(script);
+    }
+
     element.innerHTML = `
       <style>
-        .kpi-container {
-          display: flex;
-          flex-direction: column;
-          gap: 15px;
-          padding: 10px;
-          font-family: 'Roboto', 'Open Sans', sans-serif;
-          background-color: #f8f9fa;
-          height: 100%;
-        }
-        .kpi-card {
-          background: #fff;
-          border-radius: 12px;
-          padding: 24px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-          display: flex;
-          flex-direction: column;
-          border: 1px solid #e0e0e0;
-          height: 100%;
-        }
-        .kpi-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 15px;
-        }
-        .kpi-title {
-          font-size: 14px;
-          color: #5f6368;
-          font-weight: 500;
-          margin-bottom: 4px;
-        }
-        .kpi-value {
-          font-size: 32px;
-          font-weight: 700;
-          color: #202124;
-        }
-        .trend-pill {
-          font-size: 12px;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 16px;
-          display: inline-block;
-        }
-        .trend-up { background-color: #e6f4ea; color: #137333; }
-        .trend-down { background-color: #fce8e6; color: #c5221f; }
-        
-        .chart-area {
+        .chart-container {
           position: relative;
-          flex-grow: 1; 
+          height: 100%;
           width: 100%;
-          min-height: 150px;
+          overflow: hidden;
+          font-family: 'Nunito', sans-serif;
         }
-        #loading-msg { padding: 20px; font-size: 14px; color: #666; font-family: sans-serif; }
       </style>
-      <div id="loading-msg">Loading Visualization Library...</div>
-      <div id="vis-wrapper" class="kpi-container" style="display:none;"></div>
+      <div class="chart-container">
+        <canvas id="myChart"></canvas>
+      </div>
     `;
-
-    if (typeof Chart === "undefined") {
-      var script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/chart.js";
-      script.async = true;
-      document.head.appendChild(script);
-    }
+    
+    this.chartLoaded = false;
+    this._triggerUpdate = null;
   },
 
-  // Render
+  triggerUpdate: function() {
+      if(this._triggerUpdate) this._triggerUpdate();
+  },
+
+  // 3. RENDERING
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    var loader = element.querySelector("#loading-msg");
-    var wrapper = element.querySelector("#vis-wrapper");
+    this._triggerUpdate = () => { this.updateAsync(data, element, config, queryResponse, details, done); };
 
-    // 1. Library Safety Check
-    if (typeof Chart === "undefined") {
-      loader.innerHTML = "Downloading Chart.js...";
-      setTimeout(() => { this.updateAsync(data, element, config, queryResponse, details, done) }, 200);
-      return;
-    }
+    if (!this.chartLoaded || typeof Chart === "undefined") return;
 
-    // 2. Data Safety Check
     if (!data || data.length === 0) {
-      loader.innerHTML = "No data found. Check 'Raw Data' panel.";
-      return done();
+        element.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100%;color:#999;">No Data</div>`;
+        return done();
     }
 
-    // 3. Config Safety Check
-    var safeColors = config.bar_color;
-    if (!safeColors || typeof safeColors.length === 'undefined') {
-      safeColors = ["#4285F4", "#34A853", "#EA4335", "#FBBC04"]; 
-    }
+    // --- DATA PROCESSING ---
+    const dimensions = queryResponse.fields.dimension_like;
+    const measures = queryResponse.fields.measure_like;
+    const pivots = queryResponse.pivots || [];
 
-    loader.style.display = 'none';
-    wrapper.style.display = 'flex';
-    wrapper.innerHTML = ""; 
+    // X-Axis Labels
+    const xLabels = data.map(row => LookerCharts.Utils.textForCell(row[dimensions[0].name]));
 
-    var measures = queryResponse.fields.measures;
-    var dateField = queryResponse.fields.dimensions[0].name;
-
-    // --- CALCULATE GRAND TOTAL ---
-    var grandTotal = 0;
-    var firstRowTotal = 0;
-    var lastRowTotal = 0;
-
-    data.forEach((row, rowIndex) => {
-      var rowSum = 0;
-      measures.forEach(m => {
-        var val = row[m.name].value;
-        if (typeof val === 'number') rowSum += val;
-      });
-      grandTotal += rowSum;
-
-      if (rowIndex === data.length - 1) firstRowTotal = rowSum; 
-      if (rowIndex === 0) lastRowTotal = rowSum; 
-    });
-
-    var formattedTotal = grandTotal.toLocaleString('en-IE', { style: 'currency', currency: 'EUR' });
-
-    // --- CALCULATE TREND ---
-    var trendPct = firstRowTotal === 0 ? 0 : ((lastRowTotal - firstRowTotal) / firstRowTotal) * 100;
-    var trendClass = trendPct >= 0 ? "trend-up" : "trend-down";
-    var trendIcon = trendPct >= 0 ? "↑" : "↓";
-    var trendHtml = config.show_trend ? 
-      `<div class="trend-pill ${trendClass}">${trendIcon} ${Math.abs(trendPct).toFixed(1)}%</div>` : '';
-
-    // --- BUILD DATASETS ---
-    var datasets = measures.map((measure, i) => {
-      return {
-        label: measure.label_short || measure.label,
-        data: data.map(row => row[measure.name].value),
-        backgroundColor: safeColors[i % safeColors.length],
-        borderRadius: 2,
-        stack: 'Stack 0' 
-      };
-    });
-
-    // --- BUILD HTML ---
-    var card = document.createElement('div');
-    card.className = "kpi-card";
-    card.innerHTML = `
-      <div class="kpi-header">
-        <div>
-          <div class="kpi-title">Total Sales</div>
-          <div class="kpi-value">${formattedTotal}</div>
-        </div>
-        ${trendHtml}
-      </div>
-      <div class="chart-area">
-        <canvas id="stackedChart"></canvas>
-      </div>
-    `;
-    wrapper.appendChild(card);
-
-    // --- DRAW CHART ---
-    var ctx = card.querySelector('canvas').getContext('2d');
+    // Build Datasets
+    const datasets = [];
+    const defaultColors = ["#6c43e0", "#a56de2", "#e384dc", "#eda3c5", "#f0c3b0", "#8bc34a", "#ffeb3b"];
     
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: data.map(row => {
-          const raw = row[dateField].value;
-          const d = new Date(raw);
-          if (isNaN(d)) return raw;
-          return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        }), 
-        datasets: datasets
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-          mode: 'index', 
-          intersect: false,
-        },
-        plugins: {
-          legend: { display: false }, 
-          tooltip: {
-            enabled: true,
-            backgroundColor: '#ffffff',
-            titleColor: '#ffffff', 
-            bodyColor: '#333333',
-            footerColor: '#757575',
-            borderColor: '#e0e0e0',
-            borderWidth: 1,
-            padding: 12,
-            boxPadding: 6,
-            usePointStyle: true,
-            
-            callbacks: {
-              title: function() { return ''; },
-              label: function(context) {
-                let label = context.dataset.label || '';
-                let value = context.parsed.y;
-                let valStr = new Intl.NumberFormat('en-IE', { minimumFractionDigits: 2 }).format(value);
-                return label + ':  ' + valStr;
-              },
-              footer: function(context) {
-                const index = context[0].dataIndex;
-                const rawDate = data[index][dateField].value;
-                const dateObj = new Date(rawDate);
-                
-                if (isNaN(dateObj)) return rawDate;
-                return dateObj.toLocaleDateString('en-GB', { 
-                  weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' 
+    // Helper to get color
+    const getColor = (idx) => defaultColors[idx % defaultColors.length];
+
+    if (pivots.length > 0) {
+        pivots.forEach((pivot, index) => {
+            measures.forEach((measure) => {
+                const datasetData = data.map(row => {
+                     const cell = row[measure.name][pivot.key];
+                     return cell.value !== null ? cell.value : null; 
                 });
-              }
-            },
-            titleFont: { size: 0 },
-            bodyFont: { size: 13, weight: 'bold' },
-            footerFont: { size: 11, weight: 'normal' },
-            footerMarginTop: 8 
-          }
+                datasets.push({
+                    label: pivot.key,
+                    data: datasetData,
+                    backgroundColor: getColor(index),
+                    borderColor: "white",
+                    borderWidth: 1
+                });
+            });
+        });
+    } else {
+        measures.forEach((measure, index) => {
+            const datasetData = data.map(row => row[measure.name].value);
+            datasets.push({
+                label: measure.label_short || measure.label,
+                data: datasetData,
+                backgroundColor: getColor(index),
+                borderColor: "white",
+                borderWidth: 1
+            });
+        });
+    }
+
+    // --- AXIS LOGIC ---
+    
+    // Y-Axis Name Calculation
+    let yTitle = config.y_axis_name; 
+    if (!yTitle || yTitle.trim() === "") {
+        // Default to the first measure name if no user override
+        yTitle = measures[0].label_short || measures[0].label;
+    }
+
+    // Y-Axis Range Logic (Min/Max/Unpin)
+    // "Unpin from zero" means we DO NOT begin at zero.
+    const beginAtZero = !config.unpin_y_from_zero; 
+
+    // Y-Axis Configuration Object
+    const yAxisConfig = {
+        stacked: config.positioning === "stacked",
+        reverse: config.y_axis_reverse || false,
+        type: config.y_axis_scale_type || 'linear', 
+        min: (config.y_axis_min !== null && config.y_axis_min !== undefined) ? config.y_axis_min : undefined,
+        max: (config.y_axis_max !== null && config.y_axis_max !== undefined) ? config.y_axis_max : undefined,
+        beginAtZero: beginAtZero, 
+        grid: {
+            display: config.show_y_gridlines,
+            drawBorder: false
         },
-        scales: {
-          x: { 
-            stacked: true, 
-            display: true, 
-            grid: {
-              display: false, // Vertical lines hidden
-              drawBorder: false,
-            },
-            ticks: {
-              color: '#999', 
-              font: { size: 10 },
-              maxTicksLimit: 6,
-              autoSkip: true,
-              maxRotation: 0 
+        title: {
+            display: config.show_yaxis_name,
+            text: yTitle,
+            font: { family: "Nunito", weight: "bold", size: 13 },
+            color: "#666"
+        },
+        ticks: {
+            display: config.show_y_axis_values,
+            font: { family: "Nunito" },
+            // Handle Tick Density (Simple implementation)
+            maxTicksLimit: (config.y_axis_tick_density === 'custom') ? (config.y_axis_tick_count || 20) : 10,
+            callback: function(value, index, values) {
+                // If format provided, we would use D3 or similar here.
+                // For now, simple locale string with no decimals for cleaner axes
+                return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
             }
-          }, 
-          y: { 
-            stacked: true, 
-            display: true,
-            min: 0, // <--- HIDES LESS THAN 0
-            grid: {
-              display: true,
-              color: '#f0f0f0', 
-              borderDash: [5, 5], // <--- DOTTED GRID LINES
-              drawBorder: false, 
-            },
-            ticks: {
-              color: '#999', 
-              font: { size: 10 },
-              maxTicksLimit: 5, 
-              callback: function(val) {
-                if (val >= 1000) return '€' + (val/1000) + 'k';
-                return '€' + val;
-              }
-            }
-          }
         }
-      }
+    };
+
+    const xAxisConfig = {
+        stacked: config.positioning === "stacked",
+        grid: {
+            display: config.show_x_gridlines,
+            drawOnChartArea: config.show_x_gridlines
+        },
+        ticks: {
+            maxRotation: config.xaxis_label_rotation,
+            minRotation: config.xaxis_label_rotation,
+            font: { family: "Nunito" }
+        },
+        title: {
+            display: config.show_xaxis_name,
+            text: dimensions[0].label_short || dimensions[0].label,
+            font: { family: "Nunito", weight: "bold", size: 13 },
+            color: "#666"
+        }
+    };
+
+    // --- CHART CREATION ---
+    const ctx = document.getElementById('myChart').getContext('2d');
+
+    if (this.myChart) { this.myChart.destroy(); }
+    if(typeof ChartDataLabels !== 'undefined') { Chart.register(ChartDataLabels); }
+
+    this.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: xLabels, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: !config.hide_legend,
+                    position: 'top',
+                    labels: { font: { family: "Nunito" }, usePointStyle: true }
+                },
+                datalabels: {
+                    display: config.show_values,
+                    color: '#333',
+                    anchor: config.positioning === "stacked" ? 'center' : 'end',
+                    align: config.positioning === "stacked" ? 'center' : 'top',
+                    font: { size: config.value_font_size || 12, family: "Nunito", weight: "bold" },
+                    formatter: (value) => {
+                        return value.toLocaleString(); // Apply basic formatting to labels
+                    }
+                },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleFont: { family: "Nunito" },
+                    bodyFont: { family: "Nunito" }
+                }
+            },
+            scales: {
+                x: xAxisConfig,
+                y: yAxisConfig
+            },
+            layout: {
+                padding: { top: config.show_values ? 25 : 10 }
+            }
+        }
     });
 
     done();
