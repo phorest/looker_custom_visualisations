@@ -57,7 +57,7 @@ looker.plugins.visualizations.add({
         type: "number",
         label: "Title Padding (px)",
         section: "Title",
-        default: 50,
+        default: 40,
         display: "text"
     },
 
@@ -114,13 +114,6 @@ looker.plugins.visualizations.add({
       label: "Label Size (px)",
       section: "Values",
       default: 12
-    },
-    value_format: {
-        type: "string",
-        label: "Value Label Format",
-        section: "Values",
-        placeholder: "#,##0",
-        default: ""
     },
 
     // --- X AXIS TAB ---
@@ -248,28 +241,33 @@ looker.plugins.visualizations.add({
         document.head.appendChild(script);
     }
 
+    // --- REVERTED CSS STYLING ---
+    // Added 12px padding back to .vis-wrapper to allow shadow to show.
+    // Set .style-card to handle the White Background + Shadow.
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 
-        /* Global Resets */
+        /* Reset */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
             overflow: hidden !important;
+            font-family: 'Nunito', sans-serif;
         }
 
+        /* Wrapper: Transparent + Padding for Shadow */
         .vis-wrapper {
           box-sizing: border-box;
           width: 100%;
           height: 100%;
-          padding: 0; 
-          font-family: 'Nunito', sans-serif;
-          background: #f4f5f7;
+          padding: 12px; 
+          background: transparent;
         }
 
+        /* Card: White + Rounded + Shadow */
         .style-card {
           background: #ffffff;
           border-radius: 16px;
@@ -290,6 +288,7 @@ looker.plugins.visualizations.add({
           overflow: hidden;
         }
 
+        /* Tooltip */
         #chartjs-tooltip {
             background: #ffffff;
             border-radius: 12px;
@@ -371,7 +370,6 @@ looker.plugins.visualizations.add({
         return val !== null ? LookerCharts.Utils.textForCell(row[dimensions[0].name]) : "Unknown";
     });
 
-    // --- COLORS ---
     const PALETTES = {
         "shoreline": ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444"], 
         "phorest": ["#6c43e0", "#a56de2", "#e384dc", "#eda3c5", "#f0c3b0"],
@@ -387,7 +385,6 @@ looker.plugins.visualizations.add({
     if (config.reverse_colors) selectedColors = [...selectedColors].reverse();
     const getColor = (idx) => selectedColors[idx % selectedColors.length];
 
-    // --- SERIES LABELS & DATASETS ---
     let seriesOverrides = [];
     if (config.series_labels_overrides && config.series_labels_overrides.trim() !== "") {
         seriesOverrides = config.series_labels_overrides.split(',').map(s => s.trim());
@@ -409,7 +406,7 @@ looker.plugins.visualizations.add({
                 datasets.push({
                     label: SPACER + rawLabel, 
                     originalLabel: rawLabel,
-                    // Store Metadata for Drill Down
+                    // Metadata for Drill
                     _measureName: measure.name,
                     _pivotKey: pivot.key,
                     data: datasetData,
@@ -427,7 +424,7 @@ looker.plugins.visualizations.add({
             datasets.push({
                 label: SPACER + rawLabel, 
                 originalLabel: rawLabel,
-                // Store Metadata for Drill Down
+                // Metadata for Drill
                 _measureName: measure.name,
                 _pivotKey: null,
                 data: datasetData,
@@ -450,36 +447,24 @@ looker.plugins.visualizations.add({
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
-    // --- CLICK HANDLER (DRILL MENU) ---
+    // --- CLICK HANDLER (DRILL) ---
     const clickHandler = (evt, elements, chart) => {
         if (!elements || elements.length === 0) return;
-
-        // Get the first clicked element
         const element = elements[0];
         const datasetIndex = element.datasetIndex;
         const rowIndex = element.index;
-
-        // Retrieve metadata we stored in the dataset
         const dataset = chart.data.datasets[datasetIndex];
         const measureName = dataset._measureName;
         const pivotKey = dataset._pivotKey;
-
-        // Retrieve the Looker row object
         const row = data[rowIndex];
         
-        // Find the specific cell
         let cell;
         if (pivotKey) {
-            if (row[measureName] && row[measureName][pivotKey]) {
-                cell = row[measureName][pivotKey];
-            }
+            if (row[measureName] && row[measureName][pivotKey]) { cell = row[measureName][pivotKey]; }
         } else {
-            if (row[measureName]) {
-                cell = row[measureName];
-            }
+            if (row[measureName]) { cell = row[measureName]; }
         }
 
-        // Trigger Looker Drill Menu if links exist
         if (cell && cell.links) {
             LookerCharts.Utils.openDrillMenu({
                 links: cell.links,
@@ -488,7 +473,7 @@ looker.plugins.visualizations.add({
         }
     };
 
-    // --- CUSTOM TOTALS PLUGIN ---
+    // --- TOTALS PLUGIN ---
     const drawTotalsPlugin = {
         id: 'drawTotals',
         afterDatasetsDraw: (chart, args, options) => {
@@ -591,9 +576,7 @@ looker.plugins.visualizations.add({
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // CLICK HANDLER
             onClick: clickHandler,
-            // HOVER CURSOR
             onHover: (event, chartElement) => {
                 event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
             },
@@ -614,7 +597,7 @@ looker.plugins.visualizations.add({
                     },
                     color: "#111",
                     padding: { 
-                        bottom: config.chart_title_padding || 50
+                        bottom: config.chart_title_padding || 40
                     }
                 },
                 legend: {
