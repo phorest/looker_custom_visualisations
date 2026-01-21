@@ -259,12 +259,12 @@ looker.plugins.visualizations.add({
         #chartjs-tooltip {
             background: #ffffff;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             padding: 16px;
             color: #111;
             pointer-events: none;
             position: absolute;
-            transform: translate(-50%, 0);
+            /* Removed transform: translate(-50%) to handle manually */
             transition: all 0.1s ease;
             z-index: 100;
             min-width: 150px;
@@ -501,8 +501,28 @@ looker.plugins.visualizations.add({
         }
 
         const {offsetLeft: positionX, offsetTop: positionY} = chart.canvas;
+        
+        // --- EDGE DETECTION LOGIC START ---
+        const tooltipWidth = tooltipEl.offsetWidth;
+        const chartWidth = chart.width;
+        
+        // 1. Start with centered position
+        let targetLeft = positionX + tooltip.caretX - (tooltipWidth / 2);
+        
+        // 2. Prevent left clipping
+        if (targetLeft < 0) {
+            targetLeft = 0; 
+        }
+        
+        // 3. Prevent right clipping
+        // We add a small buffer (e.g. 10px) to prevent it hitting the scrollbar/edge exactly
+        if (targetLeft + tooltipWidth > chartWidth) {
+            targetLeft = chartWidth - tooltipWidth;
+        }
+        // --- EDGE DETECTION LOGIC END ---
+
         tooltipEl.style.opacity = 1;
-        tooltipEl.style.left = positionX + tooltip.caretX + 'px';
+        tooltipEl.style.left = targetLeft + 'px';
         tooltipEl.style.top = positionY + tooltip.caretY + 'px';
         tooltipEl.style.fontFamily = tooltip.options.bodyFont.family;
     };

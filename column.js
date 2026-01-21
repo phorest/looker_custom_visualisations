@@ -1,5 +1,6 @@
 looker.plugins.visualizations.add({
   options: {
+    // --- PLOT ---
     positioning: {
       type: "string",
       label: "Series Positioning",
@@ -17,6 +18,8 @@ looker.plugins.visualizations.add({
       section: "Plot",
       default: false
     },
+
+    // --- TITLE ---
     show_chart_title: {
       type: "boolean",
       label: "Show Chart Title",
@@ -56,6 +59,8 @@ looker.plugins.visualizations.add({
         default: 50,
         display: "text"
     },
+
+    // --- SERIES ---
     color_theme: {
         type: "string",
         label: "Color Collection",
@@ -89,6 +94,8 @@ looker.plugins.visualizations.add({
         section: "Series",
         default: false
     },
+
+    // --- VALUES ---
     show_values: {
       type: "boolean",
       label: "Show Value Labels",
@@ -107,6 +114,8 @@ looker.plugins.visualizations.add({
       section: "Values",
       default: 12
     },
+
+    // --- X AXIS ---
     show_xaxis_name: {
       type: "boolean",
       label: "Show Axis Name",
@@ -155,6 +164,8 @@ looker.plugins.visualizations.add({
       section: "X",
       default: false
     },
+
+    // --- Y AXIS ---
     y_axis_format_as_percent: {
         type: "boolean",
         label: "Format as Percent (0-1 = 0%-100%)",
@@ -307,7 +318,8 @@ looker.plugins.visualizations.add({
             color: #111;
             pointer-events: none;
             position: absolute;
-            transform: translate(-50%, 0);
+            /* FIX 1: REMOVED TRANSFORM TRANSLATE TO ALLOW MANUAL JS POSITIONING */
+            /* transform: translate(-50%, 0); */ 
             transition: all 0.1s ease;
             z-index: 100;
             min-width: 150px;
@@ -537,6 +549,7 @@ looker.plugins.visualizations.add({
         return tooltipEl;
     };
 
+    // --- FIX 2: UPDATED TOOLTIP POSITIONING LOGIC ---
     const externalTooltipHandler = (context) => {
         const {chart, tooltip} = context;
         const tooltipEl = getOrCreateTooltip(chart);
@@ -570,15 +583,21 @@ looker.plugins.visualizations.add({
         const tooltipWidth = tooltipEl.offsetWidth;
         const chartWidth = chart.width;
 
-        let leftPosition = positionX + tooltip.caretX;
-        if (leftPosition < tooltipWidth / 2) {
-            leftPosition = tooltipWidth / 2; 
-        } else if (leftPosition > chartWidth - tooltipWidth / 2) {
-            leftPosition = chartWidth - tooltipWidth / 2; 
+        // Start with standard centered position
+        let targetLeft = positionX + tooltip.caretX - (tooltipWidth / 2);
+
+        // Prevent Left Clipping
+        if (targetLeft < 0) {
+            targetLeft = 0; 
+        }
+
+        // Prevent Right Clipping
+        if (targetLeft + tooltipWidth > chartWidth) {
+            targetLeft = chartWidth - tooltipWidth;
         }
 
         tooltipEl.style.opacity = 1;
-        tooltipEl.style.left = leftPosition + 'px';
+        tooltipEl.style.left = targetLeft + 'px';
         tooltipEl.style.top = positionY + tooltip.caretY + 'px';
         tooltipEl.style.fontFamily = tooltip.options.bodyFont.family;
     };
