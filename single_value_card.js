@@ -304,8 +304,8 @@ looker.plugins.visualizations.add({
       if (svgPath.includes("<svg")) {
          var parser = new DOMParser();
          var doc = parser.parseFromString(svgPath, "image/svg+xml");
-         var path = doc.querySelector("path");
-         if(path) svgPath = path.outerHTML;
+         // FIX: Capture all internal SVG content, not just the first path
+         svgPath = doc.documentElement.innerHTML; 
       }
     }
 
