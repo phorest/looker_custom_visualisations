@@ -231,7 +231,7 @@ looker.plugins.visualizations.add({
         document.head.appendChild(script);
     }
 
-    // --- UPDATED CSS STYLING (Removed padding to fill tile) ---
+    // --- CSS STYLING ---
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
@@ -337,7 +337,7 @@ looker.plugins.visualizations.add({
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this._triggerUpdate = () => { this.updateAsync(data, element, config, queryResponse, details, done); };
 
-    if (!this.chartLoaded || typeof Chart === "undefined") return;
+    if (!this.chartLoaded || typeof Chart === "undefined" || typeof ChartDataLabels === "undefined") return;
 
     const chartContainer = element.querySelector(".chart-container");
     if (!data || data.length === 0) {
@@ -395,7 +395,7 @@ looker.plugins.visualizations.add({
     // Common Dataset styling
     const commonStyle = {
         fill: true,
-        spanGaps: true, // FIXED: connects lines across null values
+        spanGaps: true, // Connects lines across null values
         tension: config.line_tension || 0.4,
         pointBackgroundColor: '#ffffff', // White circle center
         pointBorderWidth: 2,
@@ -544,6 +544,7 @@ looker.plugins.visualizations.add({
     this.myChart = new Chart(canvas.getContext('2d'), {
         type: 'line', 
         data: { labels: xLabels, datasets: datasets },
+        plugins: [ChartDataLabels], // <--- ADDED PLUGIN HERE TO ACTIVATE LABELS
         options: {
             responsive: true,
             maintainAspectRatio: false,
