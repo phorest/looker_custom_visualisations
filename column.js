@@ -136,7 +136,6 @@ looker.plugins.visualizations.add({
       section: "X",
       placeholder: "Leave blank for default"
     },
-    // NEW FEATURES START
     reverse_x_names: {
         type: "boolean",
         label: "Reverse Names (Last, First)",
@@ -159,7 +158,6 @@ looker.plugins.visualizations.add({
         display: "text",
         order: 3
     },
-    // NEW FEATURES END
     xaxis_label_rotation: {
       type: "number",
       label: "Label Rotation",
@@ -323,7 +321,7 @@ looker.plugins.visualizations.add({
             color: #111;
             pointer-events: none;
             position: absolute;
-            transform: translate(-50%, 0);
+            transform: translate(-50%, 0); /* Centered by default, adjusted by JS */
             transition: all 0.1s ease;
             z-index: 100;
             min-width: 150px;
@@ -391,16 +389,12 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const pivots = queryResponse.pivots || [];
 
-    // --- REVERSE NAMES LOGIC ---
     const xLabels = data.map(row => {
         let val = row[dimensions[0].name].value;
         val = val !== null ? LookerCharts.Utils.textForCell(row[dimensions[0].name]) : "Unknown";
-
-        // Logic to flip names: "Claire Quinn" -> "Quinn, Claire"
         if (config.reverse_x_names) {
             const parts = val.trim().split(' ');
             if (parts.length > 1) {
-                // Takes the last word as the surname, puts everything else after comma
                 const last = parts.pop();
                 val = `${last}, ${parts.join(' ')}`;
             }
@@ -408,7 +402,6 @@ looker.plugins.visualizations.add({
         return val;
     });
 
-    // --- COLORS ---
     const PALETTES = {
         "shoreline": ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444"], 
         "phorest": ["#6c43e0", "#a56de2", "#e384dc", "#eda3c5", "#f0c3b0"],
@@ -478,13 +471,11 @@ looker.plugins.visualizations.add({
     const existingChart = Chart.getChart(canvas);
     if (existingChart) { existingChart.destroy(); }
 
-    // --- HELPER FUNCTIONS ---
     const safeFormat = (value) => {
         if (value === null || value === undefined) return "";
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
-    // --- CLICK HANDLER (DRILL) ---
     const clickHandler = (evt, elements, chart) => {
         if (!elements || elements.length === 0) return;
         const element = elements[0];
@@ -510,7 +501,6 @@ looker.plugins.visualizations.add({
         }
     };
 
-    // --- TOTALS PLUGIN ---
     const drawTotalsPlugin = {
         id: 'drawTotals',
         afterDatasetsDraw: (chart, args, options) => {
@@ -576,8 +566,6 @@ looker.plugins.visualizations.add({
             const rawSeriesName = dataPoint.dataset.originalLabel || dataPoint.dataset.label.trim();
             const color = dataPoint.dataset.backgroundColor;
             const value = dataPoint.formattedValue;
-            
-            // NOTE: Tooltip uses the Full Name from the data array, not the truncated tick
             const fullDateLabel = chart.data.labels[dataPoint.dataIndex]; 
 
             const innerHtml = `
@@ -594,8 +582,24 @@ looker.plugins.visualizations.add({
         }
 
         const {offsetLeft: positionX, offsetTop: positionY} = chart.canvas;
+        const tooltipWidth = tooltipEl.offsetWidth;
+        const chartWidth = chart.width;
+
+        // --- NEW CLAMPING LOGIC ---
+        // Start centered on the bar
+        let leftPosition = positionX + tooltip.caretX;
+
+        // Check Left Edge
+        if (leftPosition < tooltipWidth / 2) {
+            leftPosition = tooltipWidth / 2; // Pin to left
+        }
+        // Check Right Edge
+        else if (leftPosition > chartWidth - tooltipWidth / 2) {
+            leftPosition = chartWidth - tooltipWidth / 2; // Pin to right
+        }
+
         tooltipEl.style.opacity = 1;
-        tooltipEl.style.left = positionX + tooltip.caretX + 'px';
+        tooltipEl.style.left = leftPosition + 'px';
         tooltipEl.style.top = positionY + tooltip.caretY + 'px';
         tooltipEl.style.fontFamily = tooltip.options.bodyFont.family;
     };
@@ -676,9 +680,7 @@ looker.plugins.visualizations.add({
                         minRotation: config.xaxis_label_rotation, 
                         padding: 10, 
                         font: { weight: "600" },
-                        // TRUNCATION LOGIC
                         callback: function(val, index) {
-                            // 'val' is the index, use this.getLabelForValue to get string
                             let label = this.getLabelForValue(val);
                             if (config.truncate_x_labels && label.length > config.truncate_x_length) {
                                 return label.substr(0, config.truncate_x_length) + '...';
