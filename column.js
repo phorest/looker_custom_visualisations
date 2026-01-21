@@ -115,13 +115,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       default: 12
     },
-    value_format: {
-        type: "string",
-        label: "Value Label Format",
-        section: "Values",
-        placeholder: "#,##0",
-        default: ""
-    },
 
     // --- X AXIS TAB ---
     show_xaxis_name: {
@@ -174,6 +167,14 @@ looker.plugins.visualizations.add({
     },
 
     // --- Y AXIS TAB ---
+    // NEW OPTION ADDED HERE
+    y_axis_format_as_percent: {
+        type: "boolean",
+        label: "Format as Percent (0-1 = 0%-100%)",
+        section: "Y",
+        default: false,
+        order: 0
+    },
     show_y_gridlines: {
         type: "boolean",
         label: "Show Gridlines",
@@ -321,7 +322,7 @@ looker.plugins.visualizations.add({
             color: #111;
             pointer-events: none;
             position: absolute;
-            transform: translate(-50%, 0); /* Centered by default, adjusted by JS */
+            transform: translate(-50%, 0);
             transition: all 0.1s ease;
             z-index: 100;
             min-width: 150px;
@@ -471,11 +472,20 @@ looker.plugins.visualizations.add({
     const existingChart = Chart.getChart(canvas);
     if (existingChart) { existingChart.destroy(); }
 
+    // --- HELPER FUNCTIONS ---
+    // UPDATED: Central formatting logic used by Axis, Tooltip, and Labels
     const safeFormat = (value) => {
         if (value === null || value === undefined) return "";
+        
+        // Handle Percentage Formatting Logic
+        if (config.y_axis_format_as_percent) {
+            return (value * 100).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '%';
+        }
+
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
+    // --- CLICK HANDLER (DRILL) ---
     const clickHandler = (evt, elements, chart) => {
         if (!elements || elements.length === 0) return;
         const element = elements[0];
@@ -501,6 +511,7 @@ looker.plugins.visualizations.add({
         }
     };
 
+    // --- TOTALS PLUGIN ---
     const drawTotalsPlugin = {
         id: 'drawTotals',
         afterDatasetsDraw: (chart, args, options) => {
@@ -534,7 +545,8 @@ looker.plugins.visualizations.add({
                 });
 
                 if (hasValue) {
-                    ctx.fillText(total.toLocaleString(), x.getPixelForValue(index), topY - 5); 
+                    // Use safeFormat to apply % if needed
+                    ctx.fillText(safeFormat(total), x.getPixelForValue(index), topY - 5); 
                 }
             });
             ctx.restore();
@@ -565,7 +577,10 @@ looker.plugins.visualizations.add({
             const dataPoint = tooltip.dataPoints[0];
             const rawSeriesName = dataPoint.dataset.originalLabel || dataPoint.dataset.label.trim();
             const color = dataPoint.dataset.backgroundColor;
-            const value = dataPoint.formattedValue;
+            
+            // Use safeFormat to get the % string if enabled
+            const value = safeFormat(dataPoint.raw); 
+            
             const fullDateLabel = chart.data.labels[dataPoint.dataIndex]; 
 
             const innerHtml = `
@@ -585,17 +600,12 @@ looker.plugins.visualizations.add({
         const tooltipWidth = tooltipEl.offsetWidth;
         const chartWidth = chart.width;
 
-        // --- NEW CLAMPING LOGIC ---
-        // Start centered on the bar
+        // Clamping logic
         let leftPosition = positionX + tooltip.caretX;
-
-        // Check Left Edge
         if (leftPosition < tooltipWidth / 2) {
-            leftPosition = tooltipWidth / 2; // Pin to left
-        }
-        // Check Right Edge
-        else if (leftPosition > chartWidth - tooltipWidth / 2) {
-            leftPosition = chartWidth - tooltipWidth / 2; // Pin to right
+            leftPosition = tooltipWidth / 2; 
+        } else if (leftPosition > chartWidth - tooltipWidth / 2) {
+            leftPosition = chartWidth - tooltipWidth / 2; 
         }
 
         tooltipEl.style.opacity = 1;
@@ -661,14 +671,12 @@ looker.plugins.visualizations.add({
                     align: config.positioning === "stacked" ? 'center' : 'top',
                     offset: 4,
                     font: { size: config.value_font_size || 12, weight: "700" },
-                    formatter: (value) => (value !== null && value !== undefined) ? value.toLocaleString() : ""
+                    // Apply Percent Format if enabled
+                    formatter: (value) => safeFormat(value)
                 },
                 tooltip: {
                     enabled: false, 
-                    external: externalTooltipHandler,
-                    callbacks: {
-                       label: (context) => context.parsed.y.toLocaleString()
-                    }
+                    external: externalTooltipHandler
                 }
             },
             scales: {
@@ -702,6 +710,7 @@ looker.plugins.visualizations.add({
                     ticks: { 
                         display: config.show_y_axis_values, padding: 10, font: { weight: "600" },
                         maxTicksLimit: (config.y_axis_tick_density === 'custom') ? (config.y_axis_tick_count || 20) : 8,
+                        // Apply Percent Format to Y Axis Ticks
                         callback: (value) => safeFormat(value)
                     }
                 }
