@@ -57,7 +57,7 @@ looker.plugins.visualizations.add({
         type: "number",
         label: "Title Padding (px)",
         section: "Title",
-        default: 40,
+        default: 50,
         display: "text"
     },
 
@@ -115,6 +115,13 @@ looker.plugins.visualizations.add({
       section: "Values",
       default: 12
     },
+    value_format: {
+        type: "string",
+        label: "Value Label Format",
+        section: "Values",
+        placeholder: "#,##0",
+        default: ""
+    },
 
     // --- X AXIS TAB ---
     show_xaxis_name: {
@@ -129,6 +136,30 @@ looker.plugins.visualizations.add({
       section: "X",
       placeholder: "Leave blank for default"
     },
+    // NEW FEATURES START
+    reverse_x_names: {
+        type: "boolean",
+        label: "Reverse Names (Last, First)",
+        section: "X",
+        default: false,
+        order: 1
+    },
+    truncate_x_labels: {
+        type: "boolean",
+        label: "Truncate Labels",
+        section: "X",
+        default: false,
+        order: 2
+    },
+    truncate_x_length: {
+        type: "number",
+        label: "Max Length (chars)",
+        section: "X",
+        default: 15,
+        display: "text",
+        order: 3
+    },
+    // NEW FEATURES END
     xaxis_label_rotation: {
       type: "number",
       label: "Label Rotation",
@@ -241,14 +272,11 @@ looker.plugins.visualizations.add({
         document.head.appendChild(script);
     }
 
-    // --- REVERTED CSS STYLING ---
-    // Added 12px padding back to .vis-wrapper to allow shadow to show.
-    // Set .style-card to handle the White Background + Shadow.
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 
-        /* Reset */
+        /* Global Resets */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
@@ -258,16 +286,15 @@ looker.plugins.visualizations.add({
             font-family: 'Nunito', sans-serif;
         }
 
-        /* Wrapper: Transparent + Padding for Shadow */
         .vis-wrapper {
           box-sizing: border-box;
           width: 100%;
           height: 100%;
-          padding: 12px; 
-          background: transparent;
+          padding: 0; 
+          font-family: 'Nunito', sans-serif;
+          background: #f4f5f7;
         }
 
-        /* Card: White + Rounded + Shadow */
         .style-card {
           background: #ffffff;
           border-radius: 16px;
@@ -288,7 +315,6 @@ looker.plugins.visualizations.add({
           overflow: hidden;
         }
 
-        /* Tooltip */
         #chartjs-tooltip {
             background: #ffffff;
             border-radius: 12px;
@@ -365,11 +391,24 @@ looker.plugins.visualizations.add({
     const measures = queryResponse.fields.measure_like;
     const pivots = queryResponse.pivots || [];
 
+    // --- REVERSE NAMES LOGIC ---
     const xLabels = data.map(row => {
-        const val = row[dimensions[0].name].value;
-        return val !== null ? LookerCharts.Utils.textForCell(row[dimensions[0].name]) : "Unknown";
+        let val = row[dimensions[0].name].value;
+        val = val !== null ? LookerCharts.Utils.textForCell(row[dimensions[0].name]) : "Unknown";
+
+        // Logic to flip names: "Claire Quinn" -> "Quinn, Claire"
+        if (config.reverse_x_names) {
+            const parts = val.trim().split(' ');
+            if (parts.length > 1) {
+                // Takes the last word as the surname, puts everything else after comma
+                const last = parts.pop();
+                val = `${last}, ${parts.join(' ')}`;
+            }
+        }
+        return val;
     });
 
+    // --- COLORS ---
     const PALETTES = {
         "shoreline": ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444"], 
         "phorest": ["#6c43e0", "#a56de2", "#e384dc", "#eda3c5", "#f0c3b0"],
@@ -406,7 +445,6 @@ looker.plugins.visualizations.add({
                 datasets.push({
                     label: SPACER + rawLabel, 
                     originalLabel: rawLabel,
-                    // Metadata for Drill
                     _measureName: measure.name,
                     _pivotKey: pivot.key,
                     data: datasetData,
@@ -424,7 +462,6 @@ looker.plugins.visualizations.add({
             datasets.push({
                 label: SPACER + rawLabel, 
                 originalLabel: rawLabel,
-                // Metadata for Drill
                 _measureName: measure.name,
                 _pivotKey: null,
                 data: datasetData,
@@ -539,7 +576,9 @@ looker.plugins.visualizations.add({
             const rawSeriesName = dataPoint.dataset.originalLabel || dataPoint.dataset.label.trim();
             const color = dataPoint.dataset.backgroundColor;
             const value = dataPoint.formattedValue;
-            const dateLabel = dataPoint.label;
+            
+            // NOTE: Tooltip uses the Full Name from the data array, not the truncated tick
+            const fullDateLabel = chart.data.labels[dataPoint.dataIndex]; 
 
             const innerHtml = `
                 <div>
@@ -548,7 +587,7 @@ looker.plugins.visualizations.add({
                         ${rawSeriesName}
                     </div>
                     <div class="tooltip-value">${value}</div>
-                    <div class="tooltip-date">${dateLabel}</div>
+                    <div class="tooltip-date">${fullDateLabel}</div>
                 </div>
             `;
             tooltipEl.innerHTML = innerHtml;
@@ -597,7 +636,7 @@ looker.plugins.visualizations.add({
                     },
                     color: "#111",
                     padding: { 
-                        bottom: config.chart_title_padding || 40
+                        bottom: config.chart_title_padding || 50
                     }
                 },
                 legend: {
@@ -632,7 +671,21 @@ looker.plugins.visualizations.add({
                 x: {
                     stacked: config.positioning === "stacked",
                     grid: { display: config.show_x_gridlines, color: "#f0f0f0", drawBorder: false },
-                    ticks: { maxRotation: config.xaxis_label_rotation, minRotation: config.xaxis_label_rotation, padding: 10, font: { weight: "600" } },
+                    ticks: { 
+                        maxRotation: config.xaxis_label_rotation, 
+                        minRotation: config.xaxis_label_rotation, 
+                        padding: 10, 
+                        font: { weight: "600" },
+                        // TRUNCATION LOGIC
+                        callback: function(val, index) {
+                            // 'val' is the index, use this.getLabelForValue to get string
+                            let label = this.getLabelForValue(val);
+                            if (config.truncate_x_labels && label.length > config.truncate_x_length) {
+                                return label.substr(0, config.truncate_x_length) + '...';
+                            }
+                            return label;
+                        }
+                    },
                     title: { display: config.show_xaxis_name, text: xTitle, font: { weight: "700", size: 13 }, color: "#111" }
                 },
                 y: {
