@@ -1,7 +1,5 @@
 looker.plugins.visualizations.add({
-  // 1. CONFIGURATION OPTIONS
   options: {
-    // --- PLOT TAB ---
     positioning: {
       type: "string",
       label: "Series Mode",
@@ -37,8 +35,6 @@ looker.plugins.visualizations.add({
       section: "Plot",
       default: false
     },
-
-    // --- TITLE TAB ---
     show_chart_title: {
       type: "boolean",
       label: "Show Chart Title",
@@ -78,8 +74,6 @@ looker.plugins.visualizations.add({
         default: 20,
         display: "text"
     },
-
-    // --- SERIES TAB ---
     color_theme: {
         type: "string",
         label: "Color Collection",
@@ -113,8 +107,6 @@ looker.plugins.visualizations.add({
         section: "Series",
         default: false
     },
-
-    // --- VALUES TAB ---
     show_values: {
       type: "boolean",
       label: "Show Point Labels",
@@ -127,8 +119,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       default: 11
     },
-
-    // --- X AXIS TAB ---
     show_xaxis_name: {
       type: "boolean",
       label: "Show Axis Name",
@@ -155,8 +145,6 @@ looker.plugins.visualizations.add({
       section: "X",
       default: false
     },
-
-    // --- Y AXIS TAB ---
     show_y_gridlines: {
         type: "boolean",
         label: "Show Gridlines",
@@ -216,7 +204,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // 2. SETUP
   create: function(element, config) {
     if (!document.getElementById('chartjs-script')) {
         const script = document.createElement('script');
@@ -231,12 +218,10 @@ looker.plugins.visualizations.add({
         document.head.appendChild(script);
     }
 
-    // --- CSS STYLING ---
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 
-        /* Reset */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
@@ -246,7 +231,6 @@ looker.plugins.visualizations.add({
             font-family: 'Nunito', sans-serif;
         }
 
-        /* Wrapper: No Padding so it hits the edge */
         .vis-wrapper {
           box-sizing: border-box;
           width: 100%;
@@ -255,7 +239,6 @@ looker.plugins.visualizations.add({
           background: #ffffff;
         }
 
-        /* Card: Fill Container */
         .style-card {
           background: #ffffff;
           padding: 20px;
@@ -273,7 +256,6 @@ looker.plugins.visualizations.add({
           overflow: hidden;
         }
 
-        /* Tooltip */
         #chartjs-tooltip {
             background: #ffffff;
             border-radius: 12px;
@@ -333,7 +315,6 @@ looker.plugins.visualizations.add({
       if(this._triggerUpdate) this._triggerUpdate();
   },
 
-  // 3. RENDERING
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this._triggerUpdate = () => { this.updateAsync(data, element, config, queryResponse, details, done); };
 
@@ -345,7 +326,6 @@ looker.plugins.visualizations.add({
         return done();
     }
 
-    // --- DATA PROCESSING ---
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const pivots = queryResponse.pivots || [];
@@ -363,7 +343,6 @@ looker.plugins.visualizations.add({
         "neutral": ["#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb"]
     };
 
-    // Helper: Convert Hex to RGBA for area fill
     const hexToRgba = (hex, opacity) => {
         let c;
         if(/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)){
@@ -392,12 +371,11 @@ looker.plugins.visualizations.add({
     const datasets = [];
     const SPACER = "   "; 
 
-    // Common Dataset styling
     const commonStyle = {
         fill: true,
-        spanGaps: true, // Connects lines across null values
+        spanGaps: true,
         tension: config.line_tension || 0.4,
-        pointBackgroundColor: '#ffffff', // White circle center
+        pointBackgroundColor: '#ffffff',
         pointBorderWidth: 2,
         pointRadius: 5,
         pointHoverRadius: 7,
@@ -448,19 +426,16 @@ looker.plugins.visualizations.add({
         });
     }
 
-    // --- CHART DESTRUCTION ---
     const canvas = document.getElementById('myChart');
     if (!canvas) return done();
     const existingChart = Chart.getChart(canvas);
     if (existingChart) { existingChart.destroy(); }
 
-    // --- HELPER FUNCTIONS ---
     const safeFormat = (value) => {
         if (value === null || value === undefined) return "";
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
-    // --- CLICK HANDLER (DRILL) ---
     const clickHandler = (evt, elements, chart) => {
         if (!elements || elements.length === 0) return;
         const element = elements[0];
@@ -486,7 +461,6 @@ looker.plugins.visualizations.add({
         }
     };
 
-    // --- TOOLTIP ---
     const getOrCreateTooltip = (chart) => {
         let tooltipEl = chart.canvas.parentNode.querySelector('div#chartjs-tooltip');
         if (!tooltipEl) {
@@ -509,7 +483,7 @@ looker.plugins.visualizations.add({
         if (tooltip.body) {
             const dataPoint = tooltip.dataPoints[0];
             const rawSeriesName = dataPoint.dataset.originalLabel || dataPoint.dataset.label.trim();
-            const color = dataPoint.dataset.borderColor; // Use border color for line charts
+            const color = dataPoint.dataset.borderColor;
             const value = dataPoint.formattedValue;
             const dateLabel = dataPoint.label;
 
@@ -533,7 +507,6 @@ looker.plugins.visualizations.add({
         tooltipEl.style.fontFamily = tooltip.options.bodyFont.family;
     };
 
-    // --- CONFIG ---
     Chart.defaults.font.family = "'Nunito', sans-serif";
     Chart.defaults.color = "#6b7280"; 
 
@@ -544,7 +517,7 @@ looker.plugins.visualizations.add({
     this.myChart = new Chart(canvas.getContext('2d'), {
         type: 'line', 
         data: { labels: xLabels, datasets: datasets },
-        plugins: [ChartDataLabels], // <--- ADDED PLUGIN HERE TO ACTIVATE LABELS
+        plugins: [ChartDataLabels],
         options: {
             responsive: true,
             maintainAspectRatio: false,

@@ -1,7 +1,5 @@
 looker.plugins.visualizations.add({
-  // 1. CONFIGURATION OPTIONS
   options: {
-    // --- PLOT TAB ---
     positioning: {
       type: "string",
       label: "Series Positioning",
@@ -19,8 +17,6 @@ looker.plugins.visualizations.add({
       section: "Plot",
       default: false
     },
-
-    // --- TITLE TAB ---
     show_chart_title: {
       type: "boolean",
       label: "Show Chart Title",
@@ -60,8 +56,6 @@ looker.plugins.visualizations.add({
         default: 50,
         display: "text"
     },
-
-    // --- SERIES TAB ---
     color_theme: {
         type: "string",
         label: "Color Collection",
@@ -95,8 +89,6 @@ looker.plugins.visualizations.add({
         section: "Series",
         default: false
     },
-
-    // --- VALUES TAB ---
     show_values: {
       type: "boolean",
       label: "Show Value Labels",
@@ -115,8 +107,6 @@ looker.plugins.visualizations.add({
       section: "Values",
       default: 12
     },
-
-    // --- X AXIS TAB ---
     show_xaxis_name: {
       type: "boolean",
       label: "Show Axis Name",
@@ -165,9 +155,6 @@ looker.plugins.visualizations.add({
       section: "X",
       default: false
     },
-
-    // --- Y AXIS TAB ---
-    // NEW OPTION ADDED HERE
     y_axis_format_as_percent: {
         type: "boolean",
         label: "Format as Percent (0-1 = 0%-100%)",
@@ -256,7 +243,6 @@ looker.plugins.visualizations.add({
     }
   },
 
-  // 2. SETUP
   create: function(element, config) {
     if (!document.getElementById('chartjs-script')) {
         const script = document.createElement('script');
@@ -275,7 +261,6 @@ looker.plugins.visualizations.add({
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 
-        /* Global Resets */
         html, body, #vis {
             height: 100% !important;
             width: 100% !important;
@@ -373,7 +358,6 @@ looker.plugins.visualizations.add({
       if(this._triggerUpdate) this._triggerUpdate();
   },
 
-  // 3. RENDERING
   updateAsync: function(data, element, config, queryResponse, details, done) {
     this._triggerUpdate = () => { this.updateAsync(data, element, config, queryResponse, details, done); };
 
@@ -385,7 +369,6 @@ looker.plugins.visualizations.add({
         return done();
     }
 
-    // --- DATA PROCESSING ---
     const dimensions = queryResponse.fields.dimension_like;
     const measures = queryResponse.fields.measure_like;
     const pivots = queryResponse.pivots || [];
@@ -466,26 +449,19 @@ looker.plugins.visualizations.add({
         });
     }
 
-    // --- CHART DESTRUCTION ---
     const canvas = document.getElementById('myChart');
     if (!canvas) return done();
     const existingChart = Chart.getChart(canvas);
     if (existingChart) { existingChart.destroy(); }
 
-    // --- HELPER FUNCTIONS ---
-    // UPDATED: Central formatting logic used by Axis, Tooltip, and Labels
     const safeFormat = (value) => {
         if (value === null || value === undefined) return "";
-        
-        // Handle Percentage Formatting Logic
         if (config.y_axis_format_as_percent) {
             return (value * 100).toLocaleString(undefined, { maximumFractionDigits: 0 }) + '%';
         }
-
         return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
-    // --- CLICK HANDLER (DRILL) ---
     const clickHandler = (evt, elements, chart) => {
         if (!elements || elements.length === 0) return;
         const element = elements[0];
@@ -511,7 +487,6 @@ looker.plugins.visualizations.add({
         }
     };
 
-    // --- TOTALS PLUGIN ---
     const drawTotalsPlugin = {
         id: 'drawTotals',
         afterDatasetsDraw: (chart, args, options) => {
@@ -545,7 +520,6 @@ looker.plugins.visualizations.add({
                 });
 
                 if (hasValue) {
-                    // Use safeFormat to apply % if needed
                     ctx.fillText(safeFormat(total), x.getPixelForValue(index), topY - 5); 
                 }
             });
@@ -553,7 +527,6 @@ looker.plugins.visualizations.add({
         }
     };
 
-    // --- TOOLTIP ---
     const getOrCreateTooltip = (chart) => {
         let tooltipEl = chart.canvas.parentNode.querySelector('div#chartjs-tooltip');
         if (!tooltipEl) {
@@ -577,10 +550,7 @@ looker.plugins.visualizations.add({
             const dataPoint = tooltip.dataPoints[0];
             const rawSeriesName = dataPoint.dataset.originalLabel || dataPoint.dataset.label.trim();
             const color = dataPoint.dataset.backgroundColor;
-            
-            // Use safeFormat to get the % string if enabled
             const value = safeFormat(dataPoint.raw); 
-            
             const fullDateLabel = chart.data.labels[dataPoint.dataIndex]; 
 
             const innerHtml = `
@@ -600,7 +570,6 @@ looker.plugins.visualizations.add({
         const tooltipWidth = tooltipEl.offsetWidth;
         const chartWidth = chart.width;
 
-        // Clamping logic
         let leftPosition = positionX + tooltip.caretX;
         if (leftPosition < tooltipWidth / 2) {
             leftPosition = tooltipWidth / 2; 
@@ -614,7 +583,6 @@ looker.plugins.visualizations.add({
         tooltipEl.style.fontFamily = tooltip.options.bodyFont.family;
     };
 
-    // --- CONFIG ---
     Chart.defaults.font.family = "'Nunito', sans-serif";
     Chart.defaults.color = "#6b7280"; 
 
@@ -671,7 +639,6 @@ looker.plugins.visualizations.add({
                     align: config.positioning === "stacked" ? 'center' : 'top',
                     offset: 4,
                     font: { size: config.value_font_size || 12, weight: "700" },
-                    // Apply Percent Format if enabled
                     formatter: (value) => safeFormat(value)
                 },
                 tooltip: {
@@ -710,7 +677,6 @@ looker.plugins.visualizations.add({
                     ticks: { 
                         display: config.show_y_axis_values, padding: 10, font: { weight: "600" },
                         maxTicksLimit: (config.y_axis_tick_density === 'custom') ? (config.y_axis_tick_count || 20) : 8,
-                        // Apply Percent Format to Y Axis Ticks
                         callback: (value) => safeFormat(value)
                     }
                 }
