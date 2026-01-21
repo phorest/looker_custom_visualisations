@@ -231,7 +231,7 @@ looker.plugins.visualizations.add({
         document.head.appendChild(script);
     }
 
-    // --- CSS STYLING (Identical to Column Chart for consistency) ---
+    // --- UPDATED CSS STYLING (Removed padding to fill tile) ---
     element.innerHTML = `
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
@@ -246,22 +246,19 @@ looker.plugins.visualizations.add({
             font-family: 'Nunito', sans-serif;
         }
 
-        /* Wrapper: Transparent + Padding for Shadow */
+        /* Wrapper: No Padding so it hits the edge */
         .vis-wrapper {
           box-sizing: border-box;
           width: 100%;
           height: 100%;
-          padding: 12px; 
-          background: transparent;
+          padding: 0; 
+          background: #ffffff;
         }
 
-        /* Card: White + Rounded + Shadow */
+        /* Card: Fill Container */
         .style-card {
           background: #ffffff;
-          border-radius: 16px;
           padding: 20px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-          border: 1px solid #f0f0f0;
           height: 100%;
           width: 100%;
           box-sizing: border-box;
@@ -395,9 +392,10 @@ looker.plugins.visualizations.add({
     const datasets = [];
     const SPACER = "   "; 
 
-    // Common Dataset styling for Area Chart
+    // Common Dataset styling
     const commonStyle = {
         fill: true,
+        spanGaps: true, // FIXED: connects lines across null values
         tension: config.line_tension || 0.4,
         pointBackgroundColor: '#ffffff', // White circle center
         pointBorderWidth: 2,
@@ -544,7 +542,7 @@ looker.plugins.visualizations.add({
     let chartTitleText = config.chart_title_text || `${measures[0].label_short || measures[0].label} by ${dimensions[0].label_short || dimensions[0].label}`;
 
     this.myChart = new Chart(canvas.getContext('2d'), {
-        type: 'line', // AREA CHART IS A LINE WITH FILL
+        type: 'line', 
         data: { labels: xLabels, datasets: datasets },
         options: {
             responsive: true,
@@ -586,7 +584,7 @@ looker.plugins.visualizations.add({
                 },
                 datalabels: {
                     display: config.show_values,
-                    color: '#3B82F6', // Using a default blue for labels as per image, or use context.dataset.borderColor
+                    color: '#3B82F6', 
                     backgroundColor: '#ffffff',
                     borderRadius: 4,
                     padding: 2,
@@ -625,7 +623,7 @@ looker.plugins.visualizations.add({
                     grid: { 
                         display: config.show_y_gridlines, 
                         color: "#f3f4f6", 
-                        borderDash: [5, 5], // Dashed Gridlines per image
+                        borderDash: [5, 5], 
                         drawBorder: false 
                     },
                     title: { display: config.show_yaxis_name, text: yTitle, font: { weight: "700", size: 13 }, color: "#111" },
