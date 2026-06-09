@@ -11,7 +11,7 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Zebra Striping",
       section: "Style",
-      default: true
+      default: false
     },
     show_row_numbers: {
       type: "boolean",
@@ -34,7 +34,7 @@ looker.plugins.visualizations.add({
       type: "number",
       label: "Font Size (px)",
       section: "Style",
-      default: 14,
+      default: 15,
       display: "text"
     },
     sticky_header: {
@@ -50,7 +50,7 @@ looker.plugins.visualizations.add({
       label: "Header Background",
       display: "color",
       section: "Header",
-      default: "#6c43e0"
+      default: "#1B4769"
     },
     header_text_color: {
       type: "string",
@@ -63,7 +63,22 @@ looker.plugins.visualizations.add({
       type: "boolean",
       label: "Uppercase Headers",
       section: "Header",
+      default: false
+    },
+
+    // --- PAGINATION ---
+    enable_pagination: {
+      type: "boolean",
+      label: "Enable Pagination",
+      section: "Pagination",
       default: true
+    },
+    page_size: {
+      type: "number",
+      label: "Rows Per Page",
+      section: "Pagination",
+      default: 20,
+      display: "text"
     },
 
     // --- TOTALS ---
@@ -78,6 +93,7 @@ looker.plugins.visualizations.add({
   create: function(element, config) {
     this._sortCol = null;
     this._sortDir = 'asc';
+    this._currentPage = 1;
 
     element.innerHTML = `
       <style>
@@ -103,9 +119,11 @@ looker.plugins.visualizations.add({
 
         .vis-table-wrapper {
           width: 100%;
-          overflow: auto;
+          display: flex;
+          flex-direction: column;
           font-family: 'Nunito', sans-serif;
           box-sizing: border-box;
+          overflow: hidden;
         }
 
         .vis-table-wrapper.style-card {
@@ -122,21 +140,27 @@ looker.plugins.visualizations.add({
           border: none;
         }
 
+        .vis-table-scroll {
+          overflow: auto;
+          flex: 1;
+          min-height: 0;
+        }
+
         .vis-table {
           width: 100%;
           border-collapse: collapse;
         }
 
+        /* ---- HEADER ---- */
         .vis-table thead th {
-          padding: 12px 16px;
+          padding: 14px 24px;
           text-align: left;
-          font-weight: 700;
-          font-size: 11px;
-          letter-spacing: 0.4px;
+          font-weight: 600;
+          font-size: 13px;
           cursor: pointer;
           white-space: nowrap;
           user-select: none;
-          border-bottom: 2px solid rgba(0,0,0,0.08);
+          border-bottom: none;
           z-index: 10;
         }
 
@@ -145,14 +169,27 @@ looker.plugins.visualizations.add({
           top: 0;
         }
 
+        .vis-table thead th:first-child {
+          border-radius: 12px 0 0 0;
+        }
+
+        .vis-table thead th:last-child {
+          border-radius: 0 12px 0 0;
+        }
+
+        .vis-table-wrapper.style-transparent thead th:first-child,
+        .vis-table-wrapper.style-transparent thead th:last-child {
+          border-radius: 0;
+        }
+
         .vis-table thead th:hover {
-          filter: brightness(1.1);
+          filter: brightness(1.15);
         }
 
         .vis-table thead th .col-inner {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
         }
 
         .vis-table thead th.measure-header .col-inner {
@@ -160,19 +197,23 @@ looker.plugins.visualizations.add({
         }
 
         .sort-icon {
-          font-size: 10px;
-          opacity: 0.5;
+          font-size: 11px;
+          opacity: 0.4;
           flex-shrink: 0;
+          line-height: 1;
         }
 
         .sort-icon.active {
-          opacity: 1;
+          opacity: 0.9;
         }
 
+        /* ---- BODY ---- */
         .vis-table tbody td {
-          padding: 12px 16px;
-          border-bottom: 1px solid #f3f4f6;
-          color: #374151;
+          padding: 18px 24px;
+          border-bottom: 1px solid #f0f2f5;
+          color: #1a1a2e;
+          font-size: 15px;
+          font-weight: 400;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -184,18 +225,18 @@ looker.plugins.visualizations.add({
         }
 
         .vis-table tbody tr:hover td {
-          background: #f9fafb !important;
+          background: #f5f7fa !important;
         }
 
         .vis-table tbody td.measure-cell {
           text-align: right;
-          font-weight: 600;
-          color: #111111;
+          font-weight: 500;
+          color: #1a1a2e;
         }
 
         .vis-table tbody td.row-number-cell {
           color: #9ca3af;
-          font-size: 12px;
+          font-size: 13px;
           text-align: right;
           width: 36px;
           padding-right: 8px;
@@ -203,41 +244,133 @@ looker.plugins.visualizations.add({
 
         .vis-table tbody td.has-link {
           cursor: pointer;
-          color: #6c43e0;
+          color: #1B4769;
           font-weight: 600;
         }
 
         .vis-table tbody td.has-link:hover {
           text-decoration: underline;
+          text-decoration-color: #1B4769;
         }
 
+        /* ---- TOTALS ---- */
         .vis-table tfoot td {
-          padding: 10px 16px;
+          padding: 14px 24px;
           font-weight: 700;
           color: #111;
           border-top: 2px solid #e5e7eb;
           background: #f9fafb;
           white-space: nowrap;
+          font-size: 15px;
         }
 
         .vis-table tfoot td.measure-cell {
           text-align: right;
         }
 
-        .compact .vis-table thead th,
+        /* ---- COMPACT ---- */
+        .compact .vis-table thead th {
+          padding: 10px 16px;
+          font-size: 12px;
+        }
+
         .compact .vis-table tbody td,
         .compact .vis-table tfoot td {
-          padding: 6px 12px;
+          padding: 10px 16px;
+          font-size: 13px;
+        }
+
+        /* ---- ZEBRA ---- */
+        .zebra-on .vis-table tbody tr:nth-child(even) td {
+          background: #f8f9fb;
+        }
+
+        .zebra-on .vis-table tbody tr:nth-child(even):hover td {
+          background: #f0f2f5 !important;
+        }
+
+        /* ---- PAGINATION ---- */
+        .vis-pagination {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 24px;
+          border-top: 1px solid #f0f2f5;
+          flex-shrink: 0;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        .vis-pagination-info {
+          font-size: 13px;
+          color: #6b7280;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+
+        .vis-pagination-controls {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .page-btn {
+          min-width: 36px;
+          height: 36px;
+          padding: 0 6px;
+          border: 1px solid #e5e7eb;
+          background: #ffffff;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+          font-family: 'Nunito', sans-serif;
+          color: #374151;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+          user-select: none;
+        }
+
+        .page-btn:hover:not(:disabled) {
+          background: #f3f4f6;
+          border-color: #d1d5db;
+        }
+
+        .page-btn.active {
+          background: #F5A623;
+          border-color: #F5A623;
+          color: #ffffff;
+        }
+
+        .page-btn:disabled {
+          opacity: 0.35;
+          cursor: default;
+        }
+
+        .page-btn.ellipsis {
+          cursor: default;
+          border-color: transparent;
+          background: transparent;
+        }
+
+        .page-btn.ellipsis:hover {
+          background: transparent;
+          border-color: transparent;
         }
       </style>
 
       <div class="vis-table-outer">
         <div class="vis-table-wrapper style-card" id="table-wrapper">
-          <table class="vis-table" id="vis-table">
-            <thead id="table-head"></thead>
-            <tbody id="table-body"></tbody>
-            <tfoot id="table-foot"></tfoot>
-          </table>
+          <div class="vis-table-scroll" id="table-scroll">
+            <table class="vis-table" id="vis-table">
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
+              <tfoot id="table-foot"></tfoot>
+            </table>
+          </div>
+          <div class="vis-pagination" id="table-pagination" style="display:none;"></div>
         </div>
       </div>
     `;
@@ -259,19 +392,22 @@ looker.plugins.visualizations.add({
     const thead = element.querySelector('#table-head');
     const tbody = element.querySelector('#table-body');
     const tfoot = element.querySelector('#table-foot');
+    const pagination = element.querySelector('#table-pagination');
 
     if (!wrapper) return done();
 
-    // Card style
+    // Apply wrapper styles
     wrapper.className = 'vis-table-wrapper ' + (config.card_style === 'transparent' ? 'style-transparent' : 'style-card');
     if (config.compact) wrapper.classList.add('compact');
+    if (config.zebra_striping) wrapper.classList.add('zebra-on');
 
-    wrapper.style.fontSize = (config.font_size || 14) + 'px';
+    wrapper.querySelector('#table-scroll').style.fontSize = (config.font_size || 15) + 'px';
 
     if (!data || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="100" style="text-align:center;color:#9ca3af;padding:32px;font-family:'Nunito',sans-serif;">No data</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="100" style="text-align:center;color:#9ca3af;padding:40px;font-family:'Nunito',sans-serif;">No data</td></tr>`;
       thead.innerHTML = '';
       tfoot.innerHTML = '';
+      pagination.style.display = 'none';
       return done();
     }
 
@@ -320,38 +456,12 @@ looker.plugins.visualizations.add({
       });
     }
 
-    // Styling vars
-    const headerBg = config.header_bg_color || '#6c43e0';
+    const headerBg = config.header_bg_color || '#1B4769';
     const headerText = config.header_text_color || '#ffffff';
     const stickyClass = config.sticky_header !== false ? 'sticky-header' : '';
-    const headerTransform = config.header_uppercase !== false ? 'text-transform:uppercase;' : '';
+    const headerTransform = config.header_uppercase ? 'text-transform:uppercase;letter-spacing:0.5px;' : '';
 
-    // Build header
-    thead.innerHTML = `
-      <tr>
-        ${columns.map(col => {
-          const isMeasure = col.type === 'measure';
-          const isActive = this._sortCol === col.key;
-          const sortIcon = isActive
-            ? (this._sortDir === 'asc' ? '↑' : '↓')
-            : '↕';
-          return `
-            <th
-              class="${isMeasure ? 'measure-header' : ''} ${stickyClass}"
-              style="background:${headerBg};color:${headerText};${headerTransform}"
-              data-col-key="${col.key}"
-            >
-              <div class="col-inner">
-                <span>${col.label}</span>
-                ${col.sortable ? `<span class="sort-icon ${isActive ? 'active' : ''}">${sortIcon}</span>` : ''}
-              </div>
-            </th>
-          `;
-        }).join('')}
-      </tr>
-    `;
-
-    // Sort data
+    // Sort helpers
     const getCellValue = (row, col) => {
       if (col.type === 'row_number') return null;
       if (col.type === 'dimension') return row[col.key] ? row[col.key].value : null;
@@ -374,15 +484,49 @@ looker.plugins.visualizations.add({
       }
     }
 
+    // Pagination
+    const usePagination = config.enable_pagination !== false;
+    const pageSize = Math.max(1, config.page_size || 20);
+    const totalRows = sortedData.length;
+    const totalPages = Math.ceil(totalRows / pageSize);
+
+    if (this._currentPage > totalPages) this._currentPage = 1;
+
+    const pageData = usePagination
+      ? sortedData.slice((this._currentPage - 1) * pageSize, this._currentPage * pageSize)
+      : sortedData;
+
+    // Build header
+    thead.innerHTML = `
+      <tr>
+        ${columns.map(col => {
+          const isMeasure = col.type === 'measure';
+          const isActive = this._sortCol === col.key;
+          const sortIcon = isActive ? (this._sortDir === 'asc' ? '↑' : '↓') : '↕';
+          return `
+            <th
+              class="${isMeasure ? 'measure-header' : ''} ${stickyClass}"
+              style="background:${headerBg};color:${headerText};${headerTransform}"
+              data-col-key="${col.key}"
+            >
+              <div class="col-inner">
+                <span>${col.label}</span>
+                ${col.sortable ? `<span class="sort-icon ${isActive ? 'active' : ''}">${sortIcon}</span>` : ''}
+              </div>
+            </th>
+          `;
+        }).join('')}
+      </tr>
+    `;
+
     // Build rows
-    tbody.innerHTML = sortedData.map((row, rowIdx) => {
-      const zebraStyle = config.zebra_striping && rowIdx % 2 === 1
-        ? 'background:#f9fafb;'
-        : '';
+    tbody.innerHTML = pageData.map((row, rowIdx) => {
+      const absIdx = usePagination ? (this._currentPage - 1) * pageSize + rowIdx : rowIdx;
+      const zebraStyle = config.zebra_striping && absIdx % 2 === 1 ? 'background:#f8f9fb;' : '';
 
       const cells = columns.map(col => {
         if (col.type === 'row_number') {
-          return `<td class="row-number-cell" style="${zebraStyle}">${rowIdx + 1}</td>`;
+          return `<td class="row-number-cell" style="${zebraStyle}">${absIdx + 1}</td>`;
         }
 
         let cell;
@@ -421,14 +565,12 @@ looker.plugins.visualizations.add({
           ${columns.map(col => {
             if (col.type === 'row_number') return `<td></td>`;
             if (col.type === 'dimension') return `<td><strong>Total</strong></td>`;
-
             let cell;
             if (col.pivotKey) {
               cell = totals[col.measureName] && totals[col.measureName][col.pivotKey];
             } else {
               cell = totals[col.measureName];
             }
-
             const formatted = cell ? LookerCharts.Utils.htmlForCell(cell) : '';
             return `<td class="measure-cell">${formatted}</td>`;
           }).join('')}
@@ -438,19 +580,45 @@ looker.plugins.visualizations.add({
       tfoot.innerHTML = '';
     }
 
+    // Build pagination footer
+    if (usePagination && totalPages > 1) {
+      const start = (this._currentPage - 1) * pageSize + 1;
+      const end = Math.min(this._currentPage * pageSize, totalRows);
+
+      const pageButtons = this._buildPageButtons(this._currentPage, totalPages);
+
+      pagination.style.display = 'flex';
+      pagination.innerHTML = `
+        <span class="vis-pagination-info">Showing ${start} to ${end} of ${totalRows} results</span>
+        <div class="vis-pagination-controls">
+          <button class="page-btn" data-page="${this._currentPage - 1}" ${this._currentPage === 1 ? 'disabled' : ''}>&#8249;</button>
+          ${pageButtons.map(p => {
+            if (p === '...') return `<button class="page-btn ellipsis" disabled>…</button>`;
+            return `<button class="page-btn ${p === this._currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+          }).join('')}
+          <button class="page-btn" data-page="${this._currentPage + 1}" ${this._currentPage === totalPages ? 'disabled' : ''}>&#8250;</button>
+        </div>
+      `;
+    } else if (usePagination && totalRows > 0) {
+      pagination.style.display = 'flex';
+      pagination.innerHTML = `<span class="vis-pagination-info">Showing all ${totalRows} results</span>`;
+    } else {
+      pagination.style.display = 'none';
+    }
+
     // Sort click handlers
     thead.querySelectorAll('th[data-col-key]').forEach(th => {
       th.addEventListener('click', () => {
         const colKey = th.getAttribute('data-col-key');
         const col = columns.find(c => c.key === colKey);
         if (!col || !col.sortable) return;
-
         if (this._sortCol === colKey) {
           this._sortDir = this._sortDir === 'asc' ? 'desc' : 'asc';
         } else {
           this._sortCol = colKey;
           this._sortDir = 'asc';
         }
+        this._currentPage = 1;
         this.updateAsync(data, element, config, queryResponse, details, done);
       });
     });
@@ -462,8 +630,7 @@ looker.plugins.visualizations.add({
         const colKey = td.getAttribute('data-col-key');
         const col = columns.find(c => c.key === colKey);
         if (!col) return;
-
-        const row = sortedData[rowIdx];
+        const row = pageData[rowIdx];
         let cell;
         if (col.type === 'dimension') {
           cell = row[col.key];
@@ -472,13 +639,37 @@ looker.plugins.visualizations.add({
         } else {
           cell = row[col.measureName];
         }
-
         if (cell && cell.links && cell.links.length > 0) {
           LookerCharts.Utils.openDrillMenu({ links: cell.links, event });
         }
       });
     });
 
+    // Pagination click handlers
+    pagination.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = parseInt(btn.getAttribute('data-page'));
+        if (!page || page < 1 || page > totalPages) return;
+        this._currentPage = page;
+        this.updateAsync(data, element, config, queryResponse, details, done);
+      });
+    });
+
     done();
+  },
+
+  _buildPageButtons: function(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages = [];
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+      pages.push(i);
+    }
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
   }
 });
