@@ -255,21 +255,25 @@ looker.plugins.visualizations.add({
     this._triggerUpdate = null;
     this._resizeObserver = null;
 
+    const _markLoaded = () => { this.chartLoaded = true; this.triggerUpdate(); };
+
     if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
       this.chartLoaded = true;
     } else if (!document.getElementById('chartjs-script')) {
       const script = document.createElement('script');
       script.id = 'chartjs-script';
-      script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
       script.onload = () => {
+        if (document.getElementById('chartjs-datalabels')) { _markLoaded(); return; }
         const dlScript = document.createElement('script');
         dlScript.id = 'chartjs-datalabels';
         dlScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0';
-        dlScript.onload = () => {
+        dlScript.onload = dlScript.onerror = () => {
+          if (document.getElementById('chartjs-annotation')) { _markLoaded(); return; }
           const annScript = document.createElement('script');
           annScript.id = 'chartjs-annotation';
-          annScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3';
-          annScript.onload = () => { this.chartLoaded = true; this.triggerUpdate(); };
+          annScript.src = 'https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js';
+          annScript.onload = annScript.onerror = _markLoaded;
           document.head.appendChild(annScript);
         };
         document.head.appendChild(dlScript);
