@@ -233,11 +233,18 @@ looker.plugins.visualizations.add({
   },
 
   updateAsync: function(data, element, config, queryResponse, details, done) {
-    
+    this.clearErrors();
+
     var container = element.querySelector(".vis-container");
     if (!container) {
       this._addBaseStructure(element);
       container = element.querySelector(".vis-container");
+    }
+
+    var measures = queryResponse.fields.measures;
+    if (!measures || measures.length === 0) {
+      this.addError({ title: 'Missing Measure', message: 'Add at least one measure to the query.' });
+      return done();
     }
 
     if (!data || data.length === 0) {
@@ -245,7 +252,7 @@ looker.plugins.visualizations.add({
       return done();
     }
 
-    var measure = queryResponse.fields.measures[0];
+    var measure = measures[0];
     var cell = data[0][measure.name];
     var value = cell.value;
     var formattedValue = LookerCharts.Utils.htmlForCell(cell);
