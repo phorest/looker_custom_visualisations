@@ -253,6 +253,14 @@ looker.plugins.visualizations.add({
           text-decoration-color: #1B4769;
         }
 
+        /* Prevent the anchor Looker renders inside cells from navigating —
+           we handle clicks ourselves via openDrillMenu */
+        .vis-table tbody td.has-link a {
+          pointer-events: none;
+          text-decoration: none;
+          color: inherit;
+        }
+
         /* ---- TOTALS ---- */
         .vis-table tfoot td {
           padding: 14px 24px;
