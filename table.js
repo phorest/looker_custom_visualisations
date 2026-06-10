@@ -183,7 +183,7 @@ looker.plugins.visualizations.add({
         }
 
         .vis-table thead th:hover {
-          filter: brightness(1.15);
+          filter: brightness(1.2);
         }
 
         .vis-table thead th .col-inner {
@@ -196,15 +196,42 @@ looker.plugins.visualizations.add({
           justify-content: flex-end;
         }
 
+        /* Force any SVG Looker injects into the header (drill / pivot icons) to be white */
+        .vis-table thead th svg,
+        .vis-table thead th svg path,
+        .vis-table thead th svg rect,
+        .vis-table thead th svg circle {
+          fill: rgba(255, 255, 255, 0.75) !important;
+          stroke: rgba(255, 255, 255, 0.75) !important;
+          color: rgba(255, 255, 255, 0.75) !important;
+        }
+
         .sort-icon {
-          font-size: 11px;
-          opacity: 0.4;
+          display: inline-flex;
+          align-items: center;
           flex-shrink: 0;
-          line-height: 1;
+          opacity: 0.5;
+          color: #ffffff;
+          transition: opacity 0.15s ease;
+        }
+
+        .sort-icon svg {
+          width: 12px;
+          height: 12px;
+          fill: #ffffff !important;
+          stroke: none !important;
+        }
+
+        th:hover .sort-icon {
+          opacity: 0.8;
         }
 
         .sort-icon.active {
-          opacity: 0.9;
+          opacity: 1;
+        }
+
+        .sort-icon.active svg {
+          fill: #ffffff !important;
         }
 
         /* ---- BODY ---- */
@@ -504,13 +531,19 @@ looker.plugins.visualizations.add({
       ? sortedData.slice((this._currentPage - 1) * pageSize, this._currentPage * pageSize)
       : sortedData;
 
+    const ICON_UNSORTED = `<svg viewBox="0 0 10 14" xmlns="http://www.w3.org/2000/svg"><path d="M5 0L9 5H1L5 0Z"/><path d="M5 14L1 9H9L5 14Z"/></svg>`;
+    const ICON_ASC      = `<svg viewBox="0 0 10 8"  xmlns="http://www.w3.org/2000/svg"><path d="M5 0L9 8H1L5 0Z"/></svg>`;
+    const ICON_DESC     = `<svg viewBox="0 0 10 8"  xmlns="http://www.w3.org/2000/svg"><path d="M5 8L1 0H9L5 8Z"/></svg>`;
+
     // Build header
     thead.innerHTML = `
       <tr>
         ${columns.map(col => {
           const isMeasure = col.type === 'measure';
           const isActive = this._sortCol === col.key;
-          const sortIcon = isActive ? (this._sortDir === 'asc' ? '↑' : '↓') : '↕';
+          const sortSvg = isActive
+            ? (this._sortDir === 'asc' ? ICON_ASC : ICON_DESC)
+            : ICON_UNSORTED;
           return `
             <th
               class="${isMeasure ? 'measure-header' : ''} ${stickyClass}"
@@ -519,7 +552,7 @@ looker.plugins.visualizations.add({
             >
               <div class="col-inner">
                 <span>${col.label}</span>
-                ${col.sortable ? `<span class="sort-icon ${isActive ? 'active' : ''}">${sortIcon}</span>` : ''}
+                ${col.sortable ? `<span class="sort-icon ${isActive ? 'active' : ''}">${sortSvg}</span>` : ''}
               </div>
             </th>
           `;

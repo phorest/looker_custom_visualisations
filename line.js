@@ -558,19 +558,26 @@ looker.plugins.visualizations.add({
           const seriesName = dataset.originalLabel || dataset.label.trim();
           const row = data[dp.dataIndex];
           let formattedValue = safeFormat(dp.raw);
+          let isLink = false;
           if (row) {
             const cell = dataset._pivotKey
               ? (row[dataset._measureName] && row[dataset._measureName][dataset._pivotKey])
               : row[dataset._measureName];
-            if (cell) formattedValue = LookerCharts.Utils.htmlForCell(cell);
+            if (cell) {
+              formattedValue = LookerCharts.Utils.textForCell(cell);
+              isLink = !!(cell.links && cell.links.length > 0);
+            }
           }
+          const valueStyle = isLink
+            ? 'color:#3B82F6;text-decoration:underline;text-underline-offset:2px;'
+            : '';
           return `
             <div class="tooltip-row">
               <div class="tooltip-series">
                 <span class="tooltip-dot" style="background:${color}"></span>
                 <span class="tooltip-name">${seriesName}</span>
               </div>
-              <span class="tooltip-value">${formattedValue}</span>
+              <span class="tooltip-value" style="${valueStyle}">${formattedValue}</span>
             </div>
           `;
         }).join('');
