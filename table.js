@@ -193,7 +193,7 @@ looker.plugins.visualizations.add({
         }
 
         .vis-table thead th.measure-header .col-inner {
-          justify-content: flex-end;
+          justify-content: flex-start;
         }
 
         /* Force any SVG Looker injects into the header (drill / pivot icons) to be white */
